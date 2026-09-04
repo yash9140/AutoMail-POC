@@ -1,0 +1,60 @@
+You are looking at a Windows 11 desktop screenshot taken immediately
+after the Windows Search UI was opened and the text "Outlook" was
+typed into the search box. You do not decide what to do next — only
+report what you see and where. This is an EVALUATION-ONLY experiment:
+your answer is never used to click anything.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Analyze only what is visually present in THIS screenshot. Do not
+assume hidden application state. Do not invent something not visible.
+
+The desktop Outlook application search result is a row in the LEFT-hand
+results list, under the "Best match" heading, showing the Outlook
+application icon, the text "Outlook", and a sublabel "App".
+
+Multiple places on this screenshot may show the word "Outlook" —
+explicitly distinguish between them:
+- the "Best match" heading is NOT this word — do not use it
+- the right-side preview/details panel may also show "Outlook" as a
+  larger heading — do NOT use that one
+- any web/settings/help result mentioning "Outlook" — do NOT use those
+- ONLY the primary label text "Outlook" inside the LEFT-side result row
+  (immediately beside the small app icon) is the correct one
+
+YOUR TASK:
+
+Report a single point [y, x] that lies at the visual CENTER of the
+word "Outlook" — the primary label text specifically inside that
+LEFT-side desktop-app result row, immediately beside its icon. The
+point must fall on the visible text characters themselves.
+
+If you cannot confidently identify this specific text (as opposed to
+any of the other "Outlook" mentions listed above), do not guess —
+report target_visible as false and point as null instead.
+
+Classify target_type as one of: "desktop_app" | "web_result" |
+"settings" | "help" | "other".
+
+COORDINATE CONTRACT — the ONLY accepted format:
+
+point = [y, x], where:
+- both values are integers in the normalized range 0-1000
+- x=0 is the LEFT edge of THIS screenshot, x=1000 is the RIGHT edge
+- y=0 is the TOP edge of THIS screenshot, y=1000 is the BOTTOM edge
+- relative to the EXACT screenshot supplied above, never any other
+  screen/monitor/resolution
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "target_visible": <true only if you can confidently locate the specific label text described above, false otherwise>,
+  "target_type": "<desktop_app | web_result | settings | help | other>",
+  "visible_label": "<the exact label text, or empty string if not visible>",
+  "point": [<y>, <x>] or null if target_visible is false,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

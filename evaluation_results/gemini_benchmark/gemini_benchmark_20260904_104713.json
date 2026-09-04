@@ -1,0 +1,151 @@
+{
+  "provider": "gemini",
+  "model": "gemini-3.6-flash",
+  "results": [
+    {
+      "case_id": "outlook_search_current_screenshot",
+      "stage": "OUTLOOK_SEARCH",
+      "screenshot": "outlook_search_current_20260904.png",
+      "screenshot_bytes": 671328,
+      "screenshot_dimensions": "1920x1080",
+      "prompt_chars": 1519,
+      "schema_field_count": 7,
+      "provider_error": "Gemini request timed out after 60.0s",
+      "schema_valid": false,
+      "latency_ms": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_cost": null,
+      "parsed_json": null
+    },
+    {
+      "case_id": "outlook_search_historical_screenshot",
+      "stage": "OUTLOOK_SEARCH",
+      "screenshot": "outlook_search_historical_20260902.png",
+      "screenshot_bytes": 785850,
+      "screenshot_dimensions": "1920x1080",
+      "prompt_chars": 1519,
+      "schema_field_count": 7,
+      "provider_error": "Gemini client error (HTTP 499): The operation was cancelled.",
+      "schema_valid": false,
+      "latency_ms": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_cost": null,
+      "parsed_json": null
+    },
+    {
+      "case_id": "outlook_readiness_historical_screenshot",
+      "stage": "OUTLOOK_READINESS",
+      "screenshot": "outlook_readiness_historical_20260902.png",
+      "screenshot_bytes": 1466858,
+      "screenshot_dimensions": "1920x1080",
+      "prompt_chars": 2049,
+      "schema_field_count": 7,
+      "provider_error": null,
+      "schema_valid": true,
+      "latency_ms": 6162.212800001726,
+      "input_tokens": 1577,
+      "output_tokens": 100,
+      "estimated_cost": 0.001558,
+      "parsed_json": {
+        "application": "Outlook",
+        "outlook_visible": true,
+        "splash_screen_visible": false,
+        "ready_for_interaction": true,
+        "detected_state": "Main Outlook UI with folder navigation and email list visible",
+        "confidence": 1.0,
+        "reason": "The Microsoft Outlook window is fully loaded with interactive elements including the ribbon bar, folder pane, and message list visible."
+      }
+    },
+    {
+      "case_id": "target_email_search_CURRENT_prompt",
+      "stage": "TARGET_EMAIL_SEARCH",
+      "screenshot": "target_email_search_current_20260904.png",
+      "screenshot_bytes": 1482908,
+      "screenshot_dimensions": "1920x1080",
+      "prompt_chars": 3891,
+      "schema_field_count": 7,
+      "provider_error": null,
+      "schema_valid": true,
+      "latency_ms": 27738.288199994713,
+      "input_tokens": 2075,
+      "output_tokens": 370,
+      "estimated_cost": 0.002944,
+      "parsed_json": {
+        "outlook_visible": true,
+        "message_list_visible": true,
+        "target_visible": true,
+        "candidate_count": 3,
+        "candidates": [
+          {
+            "sender": "Yash Dhanraj",
+            "subject": "Quick Question Regar...",
+            "subject_truncated": true,
+            "date_or_order": "Wed 9:59 PM",
+            "row_bbox": [
+              276,
+              171,
+              370,
+              388
+            ],
+            "confidence": 0.98
+          },
+          {
+            "sender": "Yash Dhanraj",
+            "subject": "Important Organizatio...",
+            "subject_truncated": true,
+            "date_or_order": "Wed 6:23 PM",
+            "row_bbox": [
+              372,
+              171,
+              462,
+              388
+            ],
+            "confidence": 0.98
+          },
+          {
+            "sender": "Yash Dhanraj",
+            "subject": "Testing Outlook Deskt...",
+            "subject_truncated": true,
+            "date_or_order": "Wed 5:35 PM",
+            "row_bbox": [
+              464,
+              171,
+              556,
+              388
+            ],
+            "confidence": 0.98
+          }
+        ],
+        "more_content_below": true,
+        "reason": "Found 3 message-list rows matching sender 'Yash Dhanraj'. All subjects are truncated with ellipsis as rendered in the row."
+      }
+    },
+    {
+      "case_id": "target_email_search_HISTORICAL_prompt",
+      "stage": "TARGET_EMAIL_SEARCH",
+      "screenshot": "target_email_search_current_20260904.png",
+      "screenshot_bytes": 1482908,
+      "screenshot_dimensions": "1920x1080",
+      "prompt_chars": 3125,
+      "schema_field_count": 8,
+      "provider_error": null,
+      "schema_valid": true,
+      "latency_ms": 6375.874299992574,
+      "input_tokens": 1931,
+      "output_tokens": 94,
+      "estimated_cost": 0.001801,
+      "parsed_json": {
+        "target_visible": false,
+        "matched_subject": "",
+        "matched_sender": "",
+        "box_2d": null,
+        "x": null,
+        "y": null,
+        "confidence": 1.0,
+        "reason": "No email with the subject 'Mail for project' from sender 'Yash Dhanraj' is visible in the message list pane."
+      }
+    }
+  ]
+}

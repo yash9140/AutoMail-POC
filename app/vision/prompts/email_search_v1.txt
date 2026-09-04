@@ -1,0 +1,89 @@
+You are searching the CURRENT Outlook message-list view for emails
+matching a target the playbook has already decided on. You do not
+decide which email is interesting or relevant, and you do NOT judge
+whether a subject "matches" — you only report what you can actually
+see, verbatim. The playbook (deterministic Python) makes every matching
+decision from what you report here.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Target criteria:
+  sender:  {target_sender}
+  subject: {target_subject_clause}
+
+CRITICAL — only consider rows inside the MESSAGE LIST pane (the
+scrollable list of individual emails, each row normally showing a
+sender name, a subject line, and a date/time). Never report a
+candidate whose row falls in any of the following areas:
+- the left navigation/sidebar (folders, account name)
+- the top toolbar/ribbon
+- the reading pane (the area showing a previously selected email's
+  full content, if any)
+- any control whose function you are not certain of
+
+For EVERY row whose sender matches the target sender, report it as a
+candidate — regardless of what its subject looks like. Do NOT filter
+rows by subject yourself, and do not silently pick only one; the
+playbook decides which candidate(s), if any, are eligible.
+
+For each candidate's subject, report ONLY the text actually visible in
+that row, exactly as rendered — character for character, including a
+trailing ellipsis or cut-off word if that is literally what the row
+shows. NEVER complete, reconstruct, or guess at text that is not
+visible. Outlook often clips/ellipsizes a long subject to fit the
+row's available width — when that visibly happens (the text is cut off
+mid-word, ends in "...", "…", or is plainly narrower than the column
+would show for a short subject), set subject_truncated=true. Set it
+false only when the ENTIRE subject line is fully visible with nothing
+clipped.
+
+For each candidate, report its bounding box as [y_min, x_min, y_max,
+x_max] in the same 0-1000 normalized coordinate space used throughout
+this project. The box MUST cover the FULL CLICKABLE MESSAGE-LIST ROW —
+the entire horizontal band a user would click anywhere on to open that
+email, from just past the left navigation pane to the right edge of
+the row's visible content (sender, subject, and any preview/date text
+shown) — never just the sender text, never just the subject text,
+never only a checkbox/unread-dot/avatar icon at the row's left edge,
+never the reading pane, and never the left navigation/folder pane
+itself. A row that is only partially bounded (e.g. stopping right
+after the avatar, before the sender/subject text) is NOT acceptable —
+the box's right edge (x_max) must extend to cover the visible
+sender/subject text, not just the leftmost icon.
+
+Also report date_or_order exactly as shown in the UI (e.g. a visible
+timestamp, "Yesterday", "Mon 9/1", or the row's position in the list
+if no date is legible) — report only what is visibly present, do not
+infer or estimate a date that is not shown.
+
+If the message list appears to continue below the visible area (a
+partial row cut off at the bottom, or a scrollbar not at its end),
+report more_content_below=true.
+
+Analyze only what is visually present in this screenshot. Do not
+assume a candidate exists if you cannot actually see a row matching
+the sender. Do not invent a match, and never invent subject text.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "outlook_visible": <true if this is recognizably the Outlook mail interface>,
+  "message_list_visible": <true if the message-list pane is visible>,
+  "target_visible": <true if at least one row matching the target sender is visible>,
+  "candidate_count": <integer, number of candidates reported below>,
+  "candidates": [
+    {{
+      "sender": "<sender text exactly as shown>",
+      "subject": "<ONLY the subject text actually visible, exactly as shown, including any visible truncation like '...'>",
+      "subject_truncated": <true if the UI is visibly clipping/ellipsizing this subject, false only if the full subject is fully visible>,
+      "date_or_order": "<date/time text as shown, or empty string>",
+      "row_bbox": [<y_min>, <x_min>, <y_max>, <x_max>],
+      "confidence": <float between 0.0 and 1.0>
+    }}
+  ],
+  "more_content_below": <true or false>,
+  "reason": "<string>"
+}}

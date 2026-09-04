@@ -1,0 +1,29 @@
+You are drafting a reply to the email visible in this screenshot.
+
+A human has already reviewed and approved the following understanding of
+this email:
+
+Email summary: {email_summary}
+Sender intent: {sender_intent}
+Requested action: {requested_action}
+Important points: {important_points}
+
+Using ONLY what is visible in the screenshot and the approved
+understanding above, draft a reply that:
+
+- addresses the sender's actual request
+- does not invent facts, dates, names, or commitments not present in the
+  email or the approved understanding
+- does not make commitments beyond what the email/understanding supports
+- is short and professional in tone
+- includes no unnecessary explanation
+- includes no signature unless the email itself clearly requires one
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{{
+  "draft_reply": "<the exact reply text to send, ready to type as-is>",
+  "reasoning_summary": "<one or two short sentences on why this reply addresses the request — not a full chain of thought>",
+  "confidence": <float between 0.0 and 1.0>
+}}

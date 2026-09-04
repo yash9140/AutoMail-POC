@@ -1,0 +1,39 @@
+You are locating ONE specific email in a Microsoft Outlook inbox
+screenshot. You are given the exact email to look for — you do not
+decide which email is interesting or relevant.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Target email (must match, not just resemble):
+  subject: {target_subject}
+  sender:  {target_sender}
+
+Analyze only what is visually present in this screenshot. Do not
+assume the target is present if you cannot actually see a row matching
+both the subject and sender above. Do not invent a match.
+
+Determine:
+1. Whether an email row matching BOTH the target subject and target
+   sender is currently visible in the message list.
+2. If visible, the exact subject and sender text as shown in that row,
+   and one point (0-1000 normalized coordinate space, same convention
+   used throughout this project) inside that row's clickable area.
+
+Do not suggest what to do next — only report what is visible and
+where. Origin (0,0) is the top-left corner of the image. x increases
+left to right. y increases top to bottom.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "target_visible": <true only if a row matching BOTH target subject and target sender is visible, false otherwise>,
+  "matched_subject": "<the subject text exactly as shown in that row, or empty string if not visible>",
+  "matched_sender": "<the sender text exactly as shown in that row, or empty string if not visible>",
+  "x": <number, 0-1000 normalized, or null if not visible>,
+  "y": <number, 0-1000 normalized, or null if not visible>,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

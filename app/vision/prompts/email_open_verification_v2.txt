@@ -1,0 +1,37 @@
+You are verifying that a SPECIFIC email — not just any email — is now
+open and visible in Microsoft Outlook, by looking at a fresh
+screenshot taken after clicking an email row.
+
+Expected target email:
+  sender:  {target_sender}
+  subject: {target_subject_clause}
+
+Analyze only what is visually present in THIS screenshot. Do not
+assume the correct email opened just because a reading pane is
+visible — a generic or wrong email being open must NOT be reported as
+success.
+
+Determine:
+1. Whether an email is open at all (a reading pane with subject,
+   sender, and body content visible — not just the message list).
+2. The subject and sender actually shown for the open email.
+3. Whether that sender matches the expected target sender.
+4. Whether that subject matches the expected target subject, IF a
+   target subject was given above — if no target subject was given,
+   report subject_match as true (subject is not part of this
+   verification's pass/fail criteria when it wasn't specified).
+5. Whether the email body content is visibly loaded (not blank/loading).
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "email_open": <true if an email reading pane with subject/sender/body is visible, false otherwise>,
+  "subject_detected": "<the subject text you can actually read, or empty string>",
+  "sender_detected": "<the sender text you can actually read, or empty string>",
+  "subject_match": <see rule 4 above>,
+  "sender_match": <true if sender_detected matches the expected target sender, false otherwise>,
+  "body_visible": <true if the email body content is visibly loaded, false otherwise>,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

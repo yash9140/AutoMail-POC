@@ -1,0 +1,578 @@
+{
+  "timestamp": "2026-09-02T23:57:43.544259",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "extra_runs_case_id": "outlook_search_live_001",
+  "extra_runs": 3,
+  "results": {
+    "C_component_landmark_grounding": [
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_001",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "target_visible": true,
+          "outlook_icon_bbox": [
+            216,
+            24,
+            242,
+            38
+          ],
+          "outlook_label_bbox": [
+            217,
+            42,
+            231,
+            76
+          ],
+          "app_sublabel_bbox": [
+            233,
+            42,
+            245,
+            55
+          ],
+          "confidence": 0.72,
+          "reason": "The Outlook desktop app result is visible in the Best match section of the left panel. The small blue Outlook icon, 'Outlook' primary label text, and 'App' sublabel are all visible in the left results list. Coordinates estimated by careful inspection of the element positions within the search overlay."
+        },
+        "validation_error": null,
+        "latency_ms": 14304.940699999861,
+        "input_tokens": 2302,
+        "output_tokens": 766,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          216,
+          24,
+          245,
+          76
+        ],
+        "semantic_actual": {
+          "target_visible": true
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.0,
+          "overlap_percentage": 0.0,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            216,
+            24,
+            245,
+            76
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": {
+          "icon_bbox": [
+            216,
+            24,
+            242,
+            38
+          ],
+          "label_bbox": [
+            217,
+            42,
+            231,
+            76
+          ],
+          "sublabel_bbox": [
+            233,
+            42,
+            245,
+            55
+          ],
+          "cluster_bbox": [
+            216,
+            24,
+            245,
+            76
+          ],
+          "icon_center_in_expected": false,
+          "label_center_in_expected": false,
+          "sublabel_center_in_expected": false,
+          "cluster_center_in_expected": false,
+          "cluster_iou_with_expected": 0.0
+        },
+        "candidates_reported": null,
+        "raw_text": "I need to carefully analyze the screenshot to locate the three elements in the left-side \"Best match\" result for the Outlook desktop app.\n\nThe screenshot is 1920x1080 pixels, and I need to normalize coordinates to 0-1000.\n\nLooking at the left panel, under \"Best match\" heading, I can see:\n- A blue Outlook icon (small, on the left)\n- The text \"Outlook\" as primary label\n- The text \"App\" as secondary label\n\nThe search UI appears to start around x=40px and the result row is around y=230-270px in the actual screenshot.\n\nLet me estimate the positions:\n\nThe \"Best match\" section with Outlook is visible in the left panel. The row appears to be at approximately y=230-270 pixels in the actual image.\n\n**Outlook icon (small, in the left results list):**\n- The icon appears at roughly x=50-75px, y=232-262px\n- Normalized: x_min = 50/1920*1000 \u2248 26, x_max = 75/1920*1000 \u2248 39, y_min = 232/1080*1000 \u2248 215, y_max = 262/1080*1000 \u2248 243\n\n**\"Outlook\" label text:**\n- Appears at roughly x=82-140px, y=235-252px\n- Normalized: x_min \u2248 43, x_max \u2248 73, y_min \u2248 218, y_max \u2248 233\n\n**\"App\" sublabel text:**\n- Appears at roughly x=82-107px, y=253-265px\n- Normalized: x_min \u2248 43, x_max \u2248 56, y_min \u2248 234, y_max \u2248 245\n\nLet me re-examine more carefully. The left panel is roughly from x=40 to x=350 pixels of the 1920-wide screenshot. The Outlook row in \"Best match\" is at about y=228-268px.\n\nThe small icon: approximately x=47-73, y=233-260 \u2192 normalized: [216, 24, 241, 38]\nThe \"Outlook\" text: approximately x=80-145, y=234-250 \u2192 normalized: [217, 42, 231, 76]\nThe \"App\" text: approximately x=80-105, y=252-265 \u2192 normalized: [233, 42, 245, 55]\n\n```json\n{\n  \"target_visible\": true,\n  \"outlook_icon_bbox\": [216, 24, 242, 38],\n  \"outlook_label_bbox\": [217, 42, 231, 76],\n  \"app_sublabel_bbox\": [233, 42, 245, 55],\n  \"confidence\": 0.72,\n  \"reason\": \"The Outlook desktop app result is visible in the Best match section of the left panel. The small blue Outlook icon, 'Outlook' primary label text, and 'App' sublabel are all visible in the left results list. Coordinates estimated by careful inspection of the element positions within the search overlay.\"\n}\n```",
+        "raw_text_length": 2134,
+        "json_recovered_via_eval_fallback": true
+      },
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_001",
+        "run_index": 2,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "target_visible": true,
+          "outlook_icon_bbox": [
+            220,
+            29,
+            240,
+            40
+          ],
+          "outlook_label_bbox": [
+            220,
+            43,
+            231,
+            70
+          ],
+          "app_sublabel_bbox": [
+            232,
+            43,
+            242,
+            54
+          ],
+          "confidence": 0.72,
+          "reason": "The Best match section shows an Outlook App result in the left panel with a small colored Outlook icon, the primary label 'Outlook', and secondary label 'App' below it. Coordinates estimated by analyzing the relative position of the search panel elements within the 1920x1080 screenshot, normalized to 0-1000 range."
+        },
+        "validation_error": null,
+        "latency_ms": 18656.806299999516,
+        "input_tokens": 2302,
+        "output_tokens": 808,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          220,
+          29,
+          242,
+          70
+        ],
+        "semantic_actual": {
+          "target_visible": true
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.0,
+          "overlap_percentage": 0.0,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            220,
+            29,
+            242,
+            70
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": {
+          "icon_bbox": [
+            220,
+            29,
+            240,
+            40
+          ],
+          "label_bbox": [
+            220,
+            43,
+            231,
+            70
+          ],
+          "sublabel_bbox": [
+            232,
+            43,
+            242,
+            54
+          ],
+          "cluster_bbox": [
+            220,
+            29,
+            242,
+            70
+          ],
+          "icon_center_in_expected": false,
+          "label_center_in_expected": false,
+          "sublabel_center_in_expected": false,
+          "cluster_center_in_expected": false,
+          "cluster_iou_with_expected": 0.0
+        },
+        "candidates_reported": null,
+        "raw_text": "I need to carefully analyze the Windows Search results panel on the left side, specifically the \"Best match\" section showing the Outlook app result.\n\nLooking at the screenshot, the search UI occupies roughly the left portion of the screen (from x=0 to about x=380 in actual pixels, out of 1456 total width visible in the browser window area).\n\nThe screenshot dimensions are 1920x1080, so I need to normalize coordinates to 0-1000.\n\n**Locating the Best match section:**\nThe \"Best match\" heading appears at approximately y=200 in the screenshot (out of 1080), so normalized y \u2248 185.\n\nThe Outlook app result row is below that, at approximately y=245-265 in actual pixels.\n\n**Finding the icon:**\nThe small Outlook icon in the left results list (not the preview panel) appears at approximately:\n- Actual pixels: x\u224855-75, y\u2248238-258\n- Normalized: x_min = 55/1920*1000 \u2248 29, x_max = 75/1920*1000 \u2248 39, y_min = 238/1080*1000 \u2248 220, y_max = 258/1080*1000 \u2248 239\n\n**Finding the \"Outlook\" label text:**\nThe text \"Outlook\" appears to the right of the icon:\n- Actual pixels: x\u224880-130, y\u2248238-250\n- Normalized: x_min \u2248 42, x_max \u2248 68, y_min \u2248 220, y_max \u2248 231\n\n**Finding the \"App\" sublabel:**\nBelow \"Outlook\" text:\n- Actual pixels: x\u224880-100, y\u2248252-262\n- Normalized: x_min \u2248 42, x_max \u2248 52, y_min \u2248 233, y_max \u2248 243\n\nLet me re-examine more carefully. The search panel left edge starts around x=45px, the icon in the row at y\u2248247 center, icon size ~20px. Text \"Outlook\" starts after icon. The row appears at about y=238-265 actual pixels.\n\n- Icon: actual ~(55,238) to (75,258) \u2192 normalized [220, 29, 239, 39]\n- \"Outlook\" text: actual ~(82,238) to (133,250) \u2192 normalized [220, 43, 231, 69]\n- \"App\" text: actual ~(82,252) to (103,262) \u2192 normalized [233, 43, 243, 54]\n\n```json\n{\n  \"target_visible\": true,\n  \"outlook_icon_bbox\": [220, 29, 240, 40],\n  \"outlook_label_bbox\": [220, 43, 231, 70],\n  \"app_sublabel_bbox\": [232, 43, 242, 54],\n  \"confidence\": 0.72,\n  \"reason\": \"The Best match section shows an Outlook App result in the left panel with a small colored Outlook icon, the primary label 'Outlook', and secondary label 'App' below it. Coordinates estimated by analyzing the relative position of the search panel elements within the 1920x1080 screenshot, normalized to 0-1000 range.\"\n}\n```",
+        "raw_text_length": 2270,
+        "json_recovered_via_eval_fallback": true
+      },
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_001",
+        "run_index": 3,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "target_visible": true,
+          "outlook_icon_bbox": [
+            218,
+            27,
+            242,
+            42
+          ],
+          "outlook_label_bbox": [
+            218,
+            44,
+            229,
+            70
+          ],
+          "app_sublabel_bbox": [
+            231,
+            44,
+            241,
+            52
+          ],
+          "confidence": 0.82,
+          "reason": "The Best match section clearly shows the Outlook desktop app entry in the left panel with a small blue Outlook icon, the primary label 'Outlook', and the secondary sublabel 'App' beneath it. Coordinates are estimated based on the visible position of each element normalized to the 1920x1080 screenshot dimensions."
+        },
+        "validation_error": null,
+        "latency_ms": 10301.518100000976,
+        "input_tokens": 2302,
+        "output_tokens": 495,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          27,
+          242,
+          70
+        ],
+        "semantic_actual": {
+          "target_visible": true
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.0,
+          "overlap_percentage": 0.0,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            27,
+            242,
+            70
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": {
+          "icon_bbox": [
+            218,
+            27,
+            242,
+            42
+          ],
+          "label_bbox": [
+            218,
+            44,
+            229,
+            70
+          ],
+          "sublabel_bbox": [
+            231,
+            44,
+            241,
+            52
+          ],
+          "cluster_bbox": [
+            218,
+            27,
+            242,
+            70
+          ],
+          "icon_center_in_expected": false,
+          "label_center_in_expected": false,
+          "sublabel_center_in_expected": false,
+          "cluster_center_in_expected": false,
+          "cluster_iou_with_expected": 0.0
+        },
+        "candidates_reported": null,
+        "raw_text": "I'll analyze the screenshot carefully, focusing on the \"Best match\" result in the left panel showing the Outlook desktop app entry.\n\nLooking at the left panel, under \"Best match,\" I can see:\n- A blue Outlook icon (small, colored graphic)\n- The text \"Outlook\" as the primary label\n- The text \"App\" as the sublabel\n\nThe screenshot dimensions are 1920\u00d71080, and I need to normalize coordinates to 0-1000 scale.\n\nThe Best match row appears roughly at y\u2248245 in the visible search panel. Let me estimate more carefully:\n\nThe search panel starts at approximately x=40px, y=75px in screen coordinates.\n\nThe Outlook icon in the left panel appears at approximately:\n- Screen coords: x\u224855-75px, y\u2248235-260px\n- Normalized: x_min=28, x_max=39, y_min=217, y_max=240\n\nThe \"Outlook\" text label:\n- Screen coords: x\u224880-130px, y\u2248235-248px\n- Normalized: x_min=42, x_max=68, y_min=217, y_max=229\n\nThe \"App\" sublabel:\n- Screen coords: x\u224880-100px, y\u2248250-262px\n- Normalized: x_min=42, x_max=52, y_min=231, y_max=242\n\n```json\n{\n  \"target_visible\": true,\n  \"outlook_icon_bbox\": [218, 27, 242, 42],\n  \"outlook_label_bbox\": [218, 44, 229, 70],\n  \"app_sublabel_bbox\": [231, 44, 241, 52],\n  \"confidence\": 0.82,\n  \"reason\": \"The Best match section clearly shows the Outlook desktop app entry in the left panel with a small blue Outlook icon, the primary label 'Outlook', and the secondary sublabel 'App' beneath it. Coordinates are estimated based on the visible position of each element normalized to the 1920x1080 screenshot dimensions.\"\n}\n```",
+        "raw_text_length": 1513,
+        "json_recovered_via_eval_fallback": true
+      },
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_002",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "target_visible": true,
+          "outlook_icon_bbox": [
+            216,
+            26,
+            241,
+            41
+          ],
+          "outlook_label_bbox": [
+            217,
+            43,
+            230,
+            70
+          ],
+          "app_sublabel_bbox": [
+            231,
+            43,
+            242,
+            56
+          ],
+          "confidence": 0.72,
+          "reason": "The Best match section shows the Outlook desktop app entry with a small colored Outlook icon on the left, 'Outlook' as the primary label text to the right of the icon, and 'App' as the smaller secondary sublabel beneath it. Coordinates estimated by analyzing the visible layout of the left search results panel."
+        },
+        "validation_error": null,
+        "latency_ms": 16536.751699999513,
+        "input_tokens": 2302,
+        "output_tokens": 799,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          216,
+          26,
+          242,
+          70
+        ],
+        "semantic_actual": {
+          "target_visible": true
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.0,
+          "overlap_percentage": 0.0,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            216,
+            26,
+            242,
+            70
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": {
+          "icon_bbox": [
+            216,
+            26,
+            241,
+            41
+          ],
+          "label_bbox": [
+            217,
+            43,
+            230,
+            70
+          ],
+          "sublabel_bbox": [
+            231,
+            43,
+            242,
+            56
+          ],
+          "cluster_bbox": [
+            216,
+            26,
+            242,
+            70
+          ],
+          "icon_center_in_expected": false,
+          "label_center_in_expected": false,
+          "sublabel_center_in_expected": false,
+          "cluster_center_in_expected": false,
+          "cluster_iou_with_expected": 0.0
+        },
+        "candidates_reported": null,
+        "raw_text": "I need to carefully analyze the screenshot to locate the three elements in the left-hand \"Best match\" result for Outlook.\n\nThe screenshot is 1920x1080 pixels, and I need to normalize coordinates to 0-1000 range.\n\nLooking at the Windows Search UI, under \"Best match\" heading, I can see:\n- A row with the Outlook icon (small colored icon), the text \"Outlook\", and below it \"App\"\n\nLet me estimate the pixel positions:\n\nThe search panel appears to start around x=40 and the \"Best match\" section with Outlook is visible.\n\nThe Outlook row in the left panel appears to be around:\n- Vertically: The \"Best match\" heading is around y=200 pixels from top, and the Outlook item row is around y=230-265 pixels from top.\n\n**Outlook icon (small icon in left panel):**\n- The icon appears at approximately x=52-72 pixels, y=232-258 pixels in original coords\n- Normalized: y_min = 232/1080*1000 \u2248 215, x_min = 52/1920*1000 \u2248 27, y_max = 258/1080*1000 \u2248 239, x_max = 72/1920*1000 \u2248 38\n\n**\"Outlook\" label text:**\n- Appears at approximately x=80-130 pixels, y=233-248 pixels\n- Normalized: y_min \u2248 216, x_min \u2248 42, y_max \u2248 230, x_max \u2248 135\n\n**\"App\" sublabel text:**\n- Appears just below \"Outlook\" at approximately x=80-105 pixels, y=250-262 pixels\n- Normalized: y_min \u2248 231, x_min \u2248 42, y_max \u2248 243, x_max \u2248 83\n\nLet me re-examine more carefully. The search panel occupies roughly x=40 to x=350 pixels. The Outlook best match row is around y=228-270.\n\nThe icon is roughly 28x28px starting around x=50, y=233.\n- Icon: x=50-78, y=233-261 \u2192 normalized: y=[216,26,241,41]\n\nThe \"Outlook\" text is to the right of icon, around x=82-135, y=234-248\n- normalized: y=[217,43,230,70]\n\nThe \"App\" sublabel is below \"Outlook\", around x=82-108, y=250-262\n- normalized: y=[231,43,243,56]\n\n```json\n{\n  \"target_visible\": true,\n  \"outlook_icon_bbox\": [216, 26, 241, 41],\n  \"outlook_label_bbox\": [217, 43, 230, 70],\n  \"app_sublabel_bbox\": [231, 43, 242, 56],\n  \"confidence\": 0.72,\n  \"reason\": \"The Best match section shows the Outlook desktop app entry with a small colored Outlook icon on the left, 'Outlook' as the primary label text to the right of the icon, and 'App' as the smaller secondary sublabel beneath it. Coordinates estimated by analyzing the visible layout of the left search results panel.\"\n}\n```",
+        "raw_text_length": 2268,
+        "json_recovered_via_eval_fallback": true
+      },
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_003",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "target_visible": true,
+          "outlook_icon_bbox": [
+            216,
+            22,
+            245,
+            39
+          ],
+          "outlook_label_bbox": [
+            217,
+            44,
+            231,
+            78
+          ],
+          "app_sublabel_bbox": [
+            233,
+            44,
+            245,
+            58
+          ],
+          "confidence": 0.82,
+          "reason": "The Best match section shows the Outlook desktop app result in the left panel with a small colored Outlook icon, the primary label 'Outlook', and the secondary sublabel 'App' beneath it. Coordinates are estimated based on the visible position of these elements within the search UI panel."
+        },
+        "validation_error": null,
+        "latency_ms": 13474.924800000736,
+        "input_tokens": 2302,
+        "output_tokens": 758,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          216,
+          22,
+          245,
+          78
+        ],
+        "semantic_actual": {
+          "target_visible": true
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.0,
+          "overlap_percentage": 0.0,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            216,
+            22,
+            245,
+            78
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": {
+          "icon_bbox": [
+            216,
+            22,
+            245,
+            39
+          ],
+          "label_bbox": [
+            217,
+            44,
+            231,
+            78
+          ],
+          "sublabel_bbox": [
+            233,
+            44,
+            245,
+            58
+          ],
+          "cluster_bbox": [
+            216,
+            22,
+            245,
+            78
+          ],
+          "icon_center_in_expected": false,
+          "label_center_in_expected": false,
+          "sublabel_center_in_expected": false,
+          "cluster_center_in_expected": false,
+          "cluster_iou_with_expected": 0.0
+        },
+        "candidates_reported": null,
+        "raw_text": "I need to carefully analyze the Windows Search results panel on the left side, specifically the \"Best match\" section showing the Outlook app result.\n\nLooking at the screenshot, the search UI occupies roughly the left portion of the screen. The \"Best match\" heading appears, followed by an Outlook result row containing an icon, the label \"Outlook\", and the sublabel \"App\".\n\nLet me estimate the coordinates in normalized 0-1000 space:\n\nThe screenshot is 1920x1080 pixels.\n\nThe search panel appears to span roughly x: 40-740 pixels, y: 75-760 pixels.\n\nThe \"Best match\" row with Outlook appears at approximately y: 230-270 pixels (raw), x: 40-340 pixels (raw).\n\nBreaking down the elements:\n- The Outlook icon (small colored icon) appears at approximately x: 43-75px, y: 233-265px raw\n- The \"Outlook\" text label appears at approximately x: 85-150px, y: 233-252px raw  \n- The \"App\" sublabel appears at approximately x: 85-115px, y: 252-268px raw\n\nConverting to normalized coordinates (divide x by 1920, y by 1080, multiply by 1000):\n\n**Outlook icon**: raw approx x: 43-75, y: 233-265\n- y_min: 233/1080*1000 \u2248 216, x_min: 43/1920*1000 \u2248 22, y_max: 265/1080*1000 \u2248 245, x_max: 75/1920*1000 \u2248 39\n\n**Outlook label**: raw approx x: 85-150, y: 234-250\n- y_min: 234/1080*1000 \u2248 217, x_min: 85/1920*1000 \u2248 44, y_max: 250/1080*1000 \u2248 231, x_max: 150/1920*1000 \u2248 78\n\n**App sublabel**: raw approx x: 85-112, y: 252-265\n- y_min: 252/1080*1000 \u2248 233, x_min: 85/1920*1000 \u2248 44, y_max: 265/1080*1000 \u2248 245, x_max: 112/1920*1000 \u2248 58\n\n```json\n{\n  \"target_visible\": true,\n  \"outlook_icon_bbox\": [216, 22, 245, 39],\n  \"outlook_label_bbox\": [217, 44, 231, 78],\n  \"app_sublabel_bbox\": [233, 44, 245, 58],\n  \"confidence\": 0.82,\n  \"reason\": \"The Best match section shows the Outlook desktop app result in the left panel with a small colored Outlook icon, the primary label 'Outlook', and the secondary sublabel 'App' beneath it. Coordinates are estimated based on the visible position of these elements within the search UI panel.\"\n}\n```",
+        "raw_text_length": 2010,
+        "json_recovered_via_eval_fallback": true
+      }
+    ]
+  },
+  "summary": {
+    "C_component_landmark_grounding": {
+      "strategy": "C_component_landmark_grounding",
+      "total_calls": 5,
+      "schema_valid_rate": "5/5",
+      "provider_error_rate": "0/5",
+      "semantic_accuracy": "5/5",
+      "grounding_pass": "0/5",
+      "high_quality_grounding": "0/5",
+      "center_in_target": "0/5",
+      "mean_iou": 0.0,
+      "median_iou": 0.0,
+      "latency": {
+        "count": 5,
+        "min_ms": 10301.5,
+        "max_ms": 18656.8,
+        "median_ms": 14304.9,
+        "avg_ms": 14655.0
+      },
+      "total_cost": null,
+      "cost_known_for_calls": 0
+    }
+  },
+  "consistency": {
+    "C_component_landmark_grounding": {
+      "runs": 3,
+      "applicable": true,
+      "semantic_pass_consistent": true,
+      "bbox_pairwise_min_iou": 0.598,
+      "bbox_pairwise_avg_iou": 0.719,
+      "confidence_spread": 0.1
+    }
+  },
+  "component_special_metrics": {
+    "C_component_landmark_grounding": {
+      "icon_center_in_expected": "0/5",
+      "label_center_in_expected": "0/5",
+      "sublabel_center_in_expected": "0/5",
+      "cluster_center_in_expected": "0/5",
+      "cluster_iou_mean": 0.0
+    }
+  }
+}

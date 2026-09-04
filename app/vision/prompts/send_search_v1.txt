@@ -1,0 +1,54 @@
+You are searching the CURRENT Outlook screenshot for the Send control
+in the active reply composer that is already open. You do not decide
+whether to send — the playbook has already decided that. You only
+report what you see and where.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Find the control that is the standard Send action for the currently
+open reply composer (typically a button or ribbon/toolbar item labeled
+"Send", sometimes shown only as an icon with that meaning).
+
+CRITICAL — accept ONLY a control that clearly represents Send itself,
+performing an immediate send action. Do NOT report as a match, even if
+visible nearby or labeled similarly:
+- Schedule Send
+- Send Later
+- any delayed/scheduled-send variant
+- Forward
+- Reply
+- Reply All
+- Delete
+- any draft/save control
+- any unrelated toolbar button
+- the word "send" appearing inside the email BODY TEXT (not a control)
+
+If you cannot find a control that is unambiguously Send itself (as
+opposed to Schedule Send, Send Later, or something else), report
+send_visible=false — do NOT report a nearby or similar control as if it
+were Send.
+
+If the Send control is visible, report its bounding box as [y_min,
+x_min, y_max, x_max] in the same 0-1000 normalized coordinate space
+used throughout this project. The box must cover the FULL CLICKABLE
+CONTROL — the entire clickable button/icon area — never just a text
+label fragment or an unrelated nearby icon.
+
+Analyze only what is visually present in this screenshot. Do not
+assume Send is present if you cannot actually see it. Do not invent a
+match.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "outlook_visible": <true if this is recognizably the Outlook mail interface>,
+  "send_visible": <true only if a control unambiguously identifiable as Send itself is visible>,
+  "control_identity": "<the exact label/identity of the control you found, e.g. 'Send', 'Schedule Send', 'Reply' — empty string if none found>",
+  "control_type": "<e.g. 'button', 'ribbon icon', 'toolbar item' — empty string if none found>",
+  "bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null if send_visible is false,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

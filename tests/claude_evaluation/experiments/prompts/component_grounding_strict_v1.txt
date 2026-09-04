@@ -1,0 +1,67 @@
+CRITICAL OUTPUT FORMAT REQUIREMENT: Your entire response must be
+NOTHING but one raw JSON object. Do not write any analysis, reasoning
+steps, explanation, commentary, or markdown formatting of any kind. Do
+not use a code fence (no ``` anywhere). Do not think out loud before
+the JSON. Your response must start with the character { and end with
+the character } and contain nothing else, not even a leading or
+trailing newline of prose.
+
+You are looking at a Windows 11 desktop screenshot taken immediately
+after the Windows Search UI was opened and the text "Outlook" was
+typed into the search box. You do not decide what to do next — only
+report what you see and where. This is an EVALUATION-ONLY experiment:
+your answer is never used to click anything.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Analyze only what is visually present in THIS screenshot. Do not
+assume hidden application state. Do not invent something not visible.
+
+Do NOT try to guess the boundaries of any clickable row, container, or
+button. Do NOT reason about what might be clickable at all. Instead,
+independently locate three separate, individually visible pieces of
+content belonging to the desktop Outlook application search result
+(the one under the "Best match" heading, in the LEFT-hand results
+list — not the right-side preview panel, not a web/settings/help
+result):
+
+1. outlook_icon_bbox — the small Outlook application icon graphic
+   itself (the colored icon image), and NOTHING else.
+2. outlook_label_bbox — ONLY the text characters "Outlook" (the
+   primary label), and NOTHING else — not the icon, not the sublabel.
+3. app_sublabel_bbox — ONLY the text characters "App" (the smaller
+   secondary line beneath "Outlook"), and NOTHING else.
+
+Each of these three boxes should be a TIGHT bounding box around just
+that one visual element — as small as accurately possible, not a
+guess at some larger clickable area.
+
+If any of the three is not visible or you cannot confidently localize
+it, report that specific field as null — do not guess coordinates for
+it. Report target_visible as true only if you found at least the icon
+and the "Outlook" label for the desktop app result specifically (not a
+web/settings/help/preview-panel result).
+
+COORDINATE CONTRACT — the ONLY accepted format for every bbox:
+
+[y_min, x_min, y_max, x_max], where:
+- ALL four values are integers in the normalized range 0-1000
+- x=0 is the LEFT edge of THIS screenshot, x=1000 is the RIGHT edge
+- y=0 is the TOP edge of THIS screenshot, y=1000 is the BOTTOM edge
+- relative to the EXACT screenshot supplied above, never any other
+  screen/monitor/resolution
+
+REMINDER: output raw JSON only — no analysis, no explanation, no
+markdown, no code fence. Return ONLY this exact structure, with
+absolutely no other text before or after it:
+
+{{
+  "target_visible": <true if the desktop Outlook app result's icon and label are visible, false otherwise>,
+  "outlook_icon_bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null,
+  "outlook_label_bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null,
+  "app_sublabel_bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

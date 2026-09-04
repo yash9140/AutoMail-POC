@@ -1,0 +1,84 @@
+You are looking at a Windows 11 desktop screenshot taken immediately
+after the Windows Search UI was opened and the text "Outlook" was
+typed into the search box. You do not decide what to do next — only
+report what you see and where. A later, separate step decides whether
+to click; your report alone never authorizes any physical action.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Analyze only what is visually present in THIS screenshot. Do not
+assume hidden application state. Do not invent a result that is not
+visible.
+
+IMPORTANT LAYOUT FACTS — read carefully before answering:
+
+- "Best match" is a SECTION HEADING label. It is text only. It is NOT
+  clickable and it is NOT the search result itself.
+- The actual Outlook search result is a separate row BELOW the "Best
+  match" heading — visually lower on screen than the heading text.
+- That row visibly contains, left to right: the Outlook application
+  icon, then the text "Outlook", then a smaller secondary line of text
+  reading "App" beneath "Outlook".
+- There is a hard visual boundary between the "Best match" heading and
+  the result row beneath it (the heading has its own line; the row
+  starts on the next line down, with visible vertical spacing between
+  them).
+
+YOUR TASK:
+
+Find the ONE clickable row described above — the one containing the
+Outlook icon, the label "Outlook", and the sublabel "App".
+
+STRICT BBOX RULES:
+
+1. The bbox MUST include the Outlook icon, the "Outlook" label text,
+   and the "App" sublabel text — all three must fall inside it.
+2. The bbox MUST NOT contain any part of the "Best match" heading text.
+3. The TOP edge of your bbox (y_min) MUST be BELOW (numerically
+   greater than) the BOTTOM edge of the "Best match" heading text. If
+   you are not sure exactly where the heading ends, place y_min low
+   enough that you are confident no heading pixels are included —
+   err on the side of starting the box lower / smaller rather than
+   risk including the heading.
+4. Do NOT ground the right-side preview/details panel that may also be
+   showing "Outlook" / "App" / "Open" / "Run as administrator" — that
+   is a separate details panel, not the clickable search-result row.
+   Always ground the row in the LEFT-hand results list.
+5. Do NOT include the search input box, tabs (All/Apps/Documents/Web),
+   the results container/panel, or any other row.
+
+If you cannot confidently satisfy ALL of the rules above, do not
+guess — report target_visible as false and bbox as null instead.
+
+Classify what you found using target_type:
+- "desktop_app"  — the local desktop Outlook application result
+- "web_result"    — Outlook.com / a browser/web search result
+- "settings"      — an Outlook-related Settings result
+- "help"          — an Outlook-related Help/support result
+- "other"         — anything else, including "not sure" / not visible
+
+COORDINATE CONTRACT — the ONLY accepted format:
+
+bbox = [y_min, x_min, y_max, x_max], where:
+- ALL four values are integers in the normalized range 0-1000
+- x=0 is the LEFT edge of THIS screenshot, x=1000 is the RIGHT edge
+- y=0 is the TOP edge of THIS screenshot, y=1000 is the BOTTOM edge
+- relative to the EXACT screenshot supplied above, never any other
+  screen/monitor/resolution
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "search_visible": <true if the Windows Search UI is visible, false otherwise>,
+  "target_visible": <true only if you can confidently satisfy every bbox rule above, false otherwise>,
+  "target_type": "<desktop_app | web_result | settings | help | other>",
+  "visible_label": "<the exact label text of the result, or empty string if not visible>",
+  "visible_sublabel": "<the exact secondary/sub label text of the result, or empty string if none>",
+  "bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null if target_visible is false,
+  "bbox_tightly_scoped": <true only if you are confident bbox contains ONLY the row, not any header/container>,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

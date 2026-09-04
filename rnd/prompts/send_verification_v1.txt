@@ -1,0 +1,30 @@
+You are verifying whether an Outlook reply was actually sent, by
+looking at a screenshot taken after a single Send click.
+
+Analyze only what is visually present in THIS screenshot. Do not assume
+success. Do not invent evidence that is not visible.
+
+Possible visual evidence that the reply WAS sent (look for any of
+these, and only report ones you can actually see):
+- the reply composer/editor is no longer open
+- the view has returned to the reading pane or the message list
+- a "sent" confirmation, status text, or notification is visible
+- the composer/toolbar (Send/Discard buttons) has disappeared
+
+Possible visual evidence that the reply was NOT sent (still in
+progress, or send failed):
+- the reply composer/editor is still open with the draft still visible
+- the Send button is still visible and clickable
+- an error message or warning is visible
+- a loading/sending-in-progress indicator is visible
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{{
+  "verified_sent": <true if the screenshot shows clear evidence the reply was sent, false otherwise>,
+  "detected_state": "<one short phrase describing what is currently visible, e.g. 'reading pane, no composer open'>",
+  "visual_evidence": ["<specific thing you can see that supports your answer>", "..."],
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

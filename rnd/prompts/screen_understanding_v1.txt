@@ -1,0 +1,47 @@
+You are evaluating a Windows Outlook screenshot.
+
+Analyze only what is visually present in the screenshot.
+
+Do not assume hidden application state.
+Do not use external knowledge about the mailbox.
+Do not invent controls that are not visible.
+
+The supplied goal is:
+{goal}
+
+The original screenshot dimensions are {width} x {height} pixels.
+
+Return:
+
+1. Application visible
+2. Current screen state
+3. Short screen description
+4. Important visible interactive controls
+5. Given the supplied goal, the single best next action
+6. Target control name
+7. Approximate target coordinate in ORIGINAL screenshot pixels ({width} x {height} coordinate space)
+8. Confidence from 0.0 to 1.0
+9. Short reason
+
+Coordinate system:
+- top-left = (0,0)
+- x increases left to right
+- y increases top to bottom
+- coordinates must be within the supplied {width} x {height} image bounds
+
+Return ONLY the following structured JSON, with no other text before or after it:
+
+{{
+  "application": "<string>",
+  "screen_state": "<string>",
+  "screen_description": "<string>",
+  "visible_controls": ["<string>", "..."],
+  "recommended_action": {{
+    "action": "<string>",
+    "target": "<string>",
+    "x": <integer>,
+    "y": <integer>
+  }},
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

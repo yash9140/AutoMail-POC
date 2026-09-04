@@ -1,0 +1,40 @@
+You are verifying a typed reply draft in the Microsoft Outlook reply
+editor.
+
+This is a screenshot taken after the draft below was typed.
+
+Expected draft text:
+{expected_draft}
+
+Analyze only what is visually present in this screenshot. Read the text
+actually shown in the reply editor's text-entry area.
+
+Judge these separately:
+1. Whether the reply editor is still visibly open (reply_editor_open).
+2. The full text you can actually read in the editor, exactly as it
+   appears — do not report only the last line or last section. Check
+   that the greeting/opening line, the main body, and the closing (if
+   the expected draft has one) are ALL present, in the same order as
+   the expected draft, with no major section missing and no text
+   duplicated.
+3. Whether the visible text conveys the same content as the expected
+   draft above (semantic_match). Minor differences caused only by line
+   wrapping (where the editor breaks the same sentence across lines
+   differently) do NOT count against this — judge the actual
+   words/content and their order, not the wrapping. A draft missing
+   its opening or closing, or with a section duplicated, is NOT a
+   semantic match even if some words are correct.
+
+Do not comment on whether Send has been clicked — only describe what is
+currently visible.
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{{
+  "reply_editor_open": <true if the reply editor is still visibly open, false otherwise>,
+  "semantic_match": <true if the visible text conveys the same full content, in order, as the expected draft, false otherwise>,
+  "detected_draft": "<the full text you can actually read in the reply editor, exactly as it appears, including line breaks as best you can represent them>",
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

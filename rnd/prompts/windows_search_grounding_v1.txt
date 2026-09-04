@@ -1,0 +1,36 @@
+You are looking at a Windows 11 desktop screenshot taken immediately
+after the Windows Search UI was opened and the text "Outlook" was
+typed into the search box.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Analyze only what is visually present in this screenshot. Do not
+assume hidden application state. Do not invent a result that is not
+visible.
+
+Determine:
+1. Whether the Windows Search UI is visible.
+2. Whether an Outlook application result is visible in the search
+   results list (the desktop app, not a web link or unrelated item).
+3. If visible, the label text of that result exactly as shown, and one
+   point (in the same 0-1000 normalized coordinate space used
+   throughout this project) inside its main clickable area.
+
+Do not suggest what to do next — only report what is visible and
+where. Origin (0,0) is the top-left corner of the image. x increases
+left to right. y increases top to bottom.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "search_visible": <true if the Windows Search UI is visible, false otherwise>,
+  "outlook_result_visible": <true if an Outlook application result is visible, false otherwise>,
+  "result_label": "<the exact label text of the Outlook result, or empty string if not visible>",
+  "x": <number, 0-1000 normalized, or null if outlook_result_visible is false>,
+  "y": <number, 0-1000 normalized, or null if outlook_result_visible is false>,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

@@ -1,0 +1,128 @@
+You are looking at a Windows 11 desktop screenshot taken immediately
+after the Windows Search UI was opened and the text "Outlook" was
+typed into the search box. You do not decide what to do next — only
+report what you see and where. A later, separate step decides whether
+to click; your report alone never authorizes any physical action.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Analyze only what is visually present in THIS screenshot. Do not
+assume hidden application state. Do not invent a result that is not
+visible.
+
+YOUR SINGLE TARGET — read carefully:
+
+Find ONLY the single clickable Windows Search result ROW/TILE that
+would launch the desktop Outlook application (the local classic/new
+Outlook desktop app, not a browser tab). This is normally the top
+result under a "Best match" section, and typically looks like:
+
+  [Outlook icon]   Outlook
+                    App
+
+Do NOT ground any of the following, even if "Outlook" appears in or
+near them:
+- the entire Windows Search panel or window
+- the search-results list/group as a whole (a container, not one row)
+- the search input box/text field itself
+- the "Best match" section heading/label ITSELF (the text "Best
+  match" is a section title, not part of the clickable result — your
+  bbox must start BELOW it, at the actual result row)
+- any other section title
+- empty whitespace above or below the result row
+- a web-browser / Outlook.com / Outlook-on-the-web result
+- an Outlook-related Settings result
+- an Outlook-related Help or support result
+- a Microsoft Store suggestion or "Get Outlook" listing
+- the right-side preview/details panel that may appear (showing
+  "Outlook", "App", "Open", "Run as administrator", etc.) — that is a
+  details panel, not the clickable search-result row; always ground
+  the LEFT-SIDE result row, never the right-side preview
+- tabs such as "All" / "Apps" / "Documents" / "Web"
+- plain text elsewhere on screen that merely mentions the word
+  "Outlook" without being a clickable search result
+- a region that spans more than one candidate row/tile
+- a region that spans a section header PLUS the row beneath it
+- an icon-only crop, unless that icon IS itself the entire clickable
+  result (no separate row/tile exists to bound instead)
+- any nearby unrelated result
+
+If more than one Outlook-labeled result is visible, choose the ONE
+that is clearly the desktop application (typically the top/best-match
+result, an app icon + "Outlook" app name, not a web/settings/help
+icon), and report only that one. If you cannot confidently tell which
+one is the desktop app, report target_visible as false rather than
+guessing.
+
+Classify what you found using target_type:
+- "desktop_app"  — the local desktop Outlook application result
+- "web_result"    — Outlook.com / a browser/web search result
+- "settings"      — an Outlook-related Settings result
+- "help"          — an Outlook-related Help/support result
+- "other"         — anything else, including "not sure" / not visible
+
+Determine:
+1. Whether the Windows Search UI is visible (search_visible).
+2. Whether the single clickable desktop Outlook app result described
+   above is visible (target_visible).
+3. Its target_type (see classification above).
+4. The exact label text shown for it (visible_label), verbatim — e.g.
+   "Outlook".
+5. Its secondary/sub label text if visible (visible_sublabel), verbatim
+   — e.g. "App". Leave empty ("") if no such secondary text is visible.
+6. If target_visible is true, its bounding box (see below).
+
+BBOX TIGHTNESS — this is the part that has gone wrong before:
+
+The bbox must tightly enclose ONLY the clickable row/tile — the icon,
+the label text, and the sublabel text if present — and NOTHING else.
+It must NOT extend upward to include the "Best match" heading or any
+other section title. It must NOT extend to include the container/panel
+around it. Picture the row as its own small rectangle, distinct from
+everything above, below, or beside it.
+
+Before answering, explicitly re-check your own bbox: does it contain
+ONLY the icon + label + sublabel of this one row, or does it also
+include the section heading above it, extra whitespace, or neighboring
+content? Set bbox_tightly_scoped to true ONLY if you are confident the
+bbox contains just that row. If you are not confident the bbox is
+tightly scoped, set bbox_tightly_scoped to false — do not guess a
+tighter box you are not sure of, and do not fabricate coordinates.
+
+COORDINATE CONTRACT — read carefully, this is the ONLY accepted format:
+
+Report the bounding box as bbox = [y_min, x_min, y_max, x_max], where:
+- ALL four values are integers in the normalized range 0-1000
+- x values are horizontal position: x=0 is the LEFT edge of THIS
+  screenshot, x=1000 is the RIGHT edge
+- y values are vertical position: y=0 is the TOP edge of THIS
+  screenshot, y=1000 is the BOTTOM edge
+- the box is relative to the EXACT screenshot supplied above (the one
+  whose width/height are given), never to any other screen, monitor,
+  or assumed resolution
+
+Do NOT report a single point. Do NOT report pixel coordinates native to
+some other resolution. Do NOT report [x_min, y_min, x_max, y_max] order
+— y comes first in each pair, matching every other grounding response
+in this project.
+
+If the target is not visible, or you are not confident which result is
+the desktop app, report target_visible as false, target_type as
+"other", and bbox as null — do not guess a location.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "search_visible": <true if the Windows Search UI is visible, false otherwise>,
+  "target_visible": <true only if the single clickable desktop Outlook app result is visible, false otherwise>,
+  "target_type": "<desktop_app | web_result | settings | help | other>",
+  "visible_label": "<the exact label text of the result, or empty string if not visible>",
+  "visible_sublabel": "<the exact secondary/sub label text of the result, or empty string if none>",
+  "bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null if target_visible is false,
+  "bbox_tightly_scoped": <true only if you are confident bbox contains ONLY the row, not any header/container>,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

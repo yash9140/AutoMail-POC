@@ -1,0 +1,2423 @@
+{
+  "timestamp": "2026-09-02T23:52:44.439280",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "extra_runs_case_id": "outlook_search_live_001",
+  "extra_runs": 3,
+  "results": {
+    "A_baseline_runtime_prompt": [
+      {
+        "strategy": "A_baseline_runtime_prompt",
+        "case_id": "outlook_search_live_001",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.97,
+          "reason": "The Windows Search UI is open with 'Outlook' typed in the search box. Under the 'Best match' section, there is a single clickable row showing the Outlook icon alongside the label 'Outlook' and sublabel 'App', clearly identifying it as the desktop application. The bbox is tightly scoped to just that row (icon + label + sublabel), starting below the 'Best match' heading and not including the right-side preview panel."
+        },
+        "validation_error": null,
+        "latency_ms": 10581.45439999862,
+        "input_tokens": 3212,
+        "output_tokens": 209,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          40,
+          275,
+          335
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.043457914768827606,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "A_baseline_runtime_prompt",
+        "case_id": "outlook_search_live_001",
+        "run_index": 2,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.97,
+          "reason": "The Windows Search UI is open with 'Outlook' typed in the search box. Under 'Best match', there is a single clickable row showing the Outlook icon with label 'Outlook' and sublabel 'App'. The bbox tightly encloses only this row (icon + label + sublabel), starting below the 'Best match' heading and not including the section title or any neighboring content."
+        },
+        "validation_error": null,
+        "latency_ms": 5044.124300000476,
+        "input_tokens": 3212,
+        "output_tokens": 197,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          40,
+          275,
+          335
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.043457914768827606,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "A_baseline_runtime_prompt",
+        "case_id": "outlook_search_live_001",
+        "run_index": 3,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.97,
+          "reason": "The Windows Search UI is open with 'Outlook' typed in the search box. Under the 'Best match' section, there is a single clickable row showing the Outlook icon with label 'Outlook' and sublabel 'App'. This is the left-side result row (not the right-side preview panel). The bbox is drawn tightly around just that row, starting below the 'Best match' heading text and ending at the bottom of the row, excluding the section header above and any content below."
+        },
+        "validation_error": null,
+        "latency_ms": 5352.915199999188,
+        "input_tokens": 3212,
+        "output_tokens": 219,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          40,
+          275,
+          335
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.043457914768827606,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "A_baseline_runtime_prompt",
+        "case_id": "outlook_search_live_002",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.97,
+          "reason": "The Windows Search UI is open with 'Outlook' typed. Under the 'Best match' section, there is a single clickable row showing the Outlook icon with label 'Outlook' and sublabel 'App'. This is the left-side result row (not the right-side preview panel). The bbox is drawn tightly around just the icon and text of that row, starting below the 'Best match' heading and not including it."
+        },
+        "validation_error": null,
+        "latency_ms": 5770.457200000237,
+        "input_tokens": 3212,
+        "output_tokens": 205,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          40,
+          275,
+          335
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.043457914768827606,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "A_baseline_runtime_prompt",
+        "case_id": "outlook_search_live_003",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.97,
+          "reason": "The Windows Search UI is open with 'Outlook' typed. Under the 'Best match' section, there is a single clickable row showing the Outlook icon with label 'Outlook' and sublabel 'App'. The bbox tightly encloses only this row (icon + label + sublabel), starting below the 'Best match' heading and not including the section title or any neighboring rows."
+        },
+        "validation_error": null,
+        "latency_ms": 4353.2185000003665,
+        "input_tokens": 3212,
+        "output_tokens": 196,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          40,
+          275,
+          335
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.043457914768827606,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      }
+    ],
+    "B_landmark_relative_prompt": [
+      {
+        "strategy": "B_landmark_relative_prompt",
+        "case_id": "outlook_search_live_001",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            218,
+            22,
+            282,
+            340
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.95,
+          "reason": "The Windows Search UI is clearly visible with 'Outlook' typed in the search box. The clickable result row containing the Outlook icon, 'Outlook' label, and 'App' sublabel is located in the left-hand results list below the 'Best match' heading. The 'Best match' heading text appears at approximately y=185-205 in normalized coordinates. The actual result row starts below that, with the icon and text spanning roughly y=218 to y=282. The bbox is confined to the left panel result row only, excluding the right-side details/preview panel."
+        },
+        "validation_error": null,
+        "latency_ms": 5476.619400000345,
+        "input_tokens": 2654,
+        "output_tokens": 238,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          22,
+          282,
+          340
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.08949508042184647,
+          "overlap_percentage": 0.18265993265993266,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            22,
+            282,
+            340
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "B_landmark_relative_prompt",
+        "case_id": "outlook_search_live_001",
+        "run_index": 2,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            268,
+            42,
+            335,
+            340
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.95,
+          "reason": "The Windows Search UI is open with 'Outlook' typed. The clickable result row in the left panel contains the Outlook icon, the label 'Outlook', and the sublabel 'App'. The 'Best match' heading appears above this row. I placed y_min at 268 (normalized) to exclude the heading text, and y_max at 335 to capture the full row including the sublabel. x_min at 42 and x_max at 340 cover the left-panel row without including the right-side details/preview panel."
+        },
+        "validation_error": null,
+        "latency_ms": 5663.494500000525,
+        "input_tokens": 2654,
+        "output_tokens": 233,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          268,
+          42,
+          335,
+          340
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": true,
+          "expected_center_inside_predicted": true,
+          "iou": 0.5640839352109065,
+          "overlap_percentage": 0.7935906685906686,
+          "grounding_pass": true,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            268,
+            42,
+            335,
+            340
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "B_landmark_relative_prompt",
+        "case_id": "outlook_search_live_001",
+        "run_index": 3,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            272,
+            40,
+            335,
+            335
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.93,
+          "reason": "The Windows Search UI is open with 'Outlook' typed. The Best match section heading appears at roughly y=255 in normalized coords. Below it, the clickable result row containing the Outlook icon, 'Outlook' label, and 'App' sublabel is visible in the left-hand results list. I set y_min=272 to be safely below the 'Best match' heading text, and y_max=335 to capture the full row including the sublabel. x_min=40 and x_max=335 bound the left-panel row only, excluding the right-side details/preview panel."
+        },
+        "validation_error": null,
+        "latency_ms": 5330.787000000782,
+        "input_tokens": 2654,
+        "output_tokens": 246,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          272,
+          40,
+          335,
+          335
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": true,
+          "expected_center_inside_predicted": true,
+          "iou": 0.5527777777777778,
+          "overlap_percentage": 0.7537878787878788,
+          "grounding_pass": true,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            272,
+            40,
+            335,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "B_landmark_relative_prompt",
+        "case_id": "outlook_search_live_002",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            268,
+            42,
+            340,
+            335
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.95,
+          "reason": "The Windows Search UI is open with 'Outlook' typed. The Best match section heading appears around y~185-210 in normalized coords. Below it, the clickable result row containing the Outlook icon, 'Outlook' label, and 'App' sublabel is clearly visible. I placed y_min at 268 to ensure the 'Best match' heading text is fully excluded, and y_max at 340 to capture the full row including the sublabel. x_min=42 and x_max=335 capture the left-hand result row only, excluding the right-side details panel."
+        },
+        "validation_error": null,
+        "latency_ms": 5948.28619999862,
+        "input_tokens": 2654,
+        "output_tokens": 243,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          268,
+          42,
+          340,
+          335
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": true,
+          "expected_center_inside_predicted": true,
+          "iou": 0.6024464831804281,
+          "overlap_percentage": 0.8528138528138528,
+          "grounding_pass": true,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            268,
+            42,
+            340,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "B_landmark_relative_prompt",
+        "case_id": "outlook_search_live_003",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App",
+          "bbox": [
+            218,
+            40,
+            275,
+            340
+          ],
+          "bbox_tightly_scoped": true,
+          "confidence": 0.95,
+          "reason": "The Windows Search UI is open with 'Outlook' typed. The clickable result row in the left-hand results list contains the Outlook icon (blue envelope), the label 'Outlook', and the sublabel 'App'. The 'Best match' heading appears above this row. The bbox is placed below the heading text and tightly wraps the icon+label+sublabel row, excluding the right-side details panel. Coordinates are normalized to the 0-1000 range based on the screenshot dimensions (1920x1080)."
+        },
+        "validation_error": null,
+        "latency_ms": 5589.740299999903,
+        "input_tokens": 2654,
+        "output_tokens": 227,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          40,
+          275,
+          340
+        ],
+        "semantic_actual": {
+          "search_visible": true,
+          "target_visible": true,
+          "target_type": "desktop_app",
+          "visible_label": "Outlook",
+          "visible_sublabel": "App"
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.04307492501314203,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            40,
+            275,
+            340
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": null
+      }
+    ],
+    "C_component_landmark_grounding": [
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_001",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": false,
+        "parsed_json": null,
+        "validation_error": "Provider returned no parseable JSON.",
+        "latency_ms": 12047.98700000174,
+        "input_tokens": 2302,
+        "output_tokens": 689,
+        "estimated_cost": null,
+        "predicted_bbox": null,
+        "semantic_actual": null,
+        "semantic_pass": null,
+        "grounding": null,
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_001",
+        "run_index": 2,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": false,
+        "parsed_json": null,
+        "validation_error": "Provider returned no parseable JSON.",
+        "latency_ms": 10661.049999998795,
+        "input_tokens": 2302,
+        "output_tokens": 517,
+        "estimated_cost": null,
+        "predicted_bbox": null,
+        "semantic_actual": null,
+        "semantic_pass": null,
+        "grounding": null,
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_001",
+        "run_index": 3,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": false,
+        "parsed_json": null,
+        "validation_error": "Provider returned no parseable JSON.",
+        "latency_ms": 13512.466499998482,
+        "input_tokens": 2302,
+        "output_tokens": 611,
+        "estimated_cost": null,
+        "predicted_bbox": null,
+        "semantic_actual": null,
+        "semantic_pass": null,
+        "grounding": null,
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_002",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": false,
+        "parsed_json": null,
+        "validation_error": "Provider returned no parseable JSON.",
+        "latency_ms": 11766.297800000757,
+        "input_tokens": 2302,
+        "output_tokens": 523,
+        "estimated_cost": null,
+        "predicted_bbox": null,
+        "semantic_actual": null,
+        "semantic_pass": null,
+        "grounding": null,
+        "component": null,
+        "candidates_reported": null
+      },
+      {
+        "strategy": "C_component_landmark_grounding",
+        "case_id": "outlook_search_live_003",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": false,
+        "parsed_json": null,
+        "validation_error": "Provider returned no parseable JSON.",
+        "latency_ms": 14532.581499999651,
+        "input_tokens": 2302,
+        "output_tokens": 769,
+        "estimated_cost": null,
+        "predicted_bbox": null,
+        "semantic_actual": null,
+        "semantic_pass": null,
+        "grounding": null,
+        "component": null,
+        "candidates_reported": null
+      }
+    ],
+    "D_candidate_list": [
+      {
+        "strategy": "D_candidate_list",
+        "case_id": "outlook_search_live_001",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "candidates": [
+            {
+              "visible_label": "Outlook",
+              "visible_sublabel": "App",
+              "target_type": "desktop_app",
+              "bbox": [
+                218,
+                40,
+                275,
+                335
+              ],
+              "confidence": 0.99
+            },
+            {
+              "visible_label": "outlook",
+              "visible_sublabel": "See more search results",
+              "target_type": "web_result",
+              "bbox": [
+                323,
+                40,
+                360,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook classic",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                360,
+                40,
+                398,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook login",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                398,
+                40,
+                436,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook 365",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                436,
+                40,
+                474,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "initial.outlookManifest",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                513,
+                40,
+                551,
+                335
+              ],
+              "confidence": 0.93
+            },
+            {
+              "visible_label": "multi-screen-ai-Automation",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                551,
+                40,
+                589,
+                335
+              ],
+              "confidence": 0.93
+            },
+            {
+              "visible_label": "ZSchema-browser-test",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                589,
+                40,
+                627,
+                335
+              ],
+              "confidence": 0.92
+            },
+            {
+              "visible_label": "ZSchema-browser-min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                627,
+                40,
+                665,
+                335
+              ],
+              "confidence": 0.92
+            },
+            {
+              "visible_label": "validator.min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                665,
+                40,
+                703,
+                335
+              ],
+              "confidence": 0.92
+            }
+          ],
+          "reason": "I identified all visible search result rows in the Windows 11 Search UI panel. The 'Best match' section contains one desktop app entry for Outlook. The 'Search the web' section contains four web result rows. The 'Documents' section contains five document file rows. The Settings section heading is visible but no individual settings rows are clearly rendered within the screenshot bounds. The right-side preview panel (Open, Run as administrator, etc.) is excluded as instructed."
+        },
+        "validation_error": null,
+        "latency_ms": 11081.422100000054,
+        "input_tokens": 2281,
+        "output_tokens": 782,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          40,
+          275,
+          335
+        ],
+        "semantic_actual": {
+          "unique_desktop_app_match_found": true,
+          "match_count": 1,
+          "total_candidates_reported": 10
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.043457914768827606,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": [
+          {
+            "visible_label": "Outlook",
+            "visible_sublabel": "App",
+            "target_type": "desktop_app",
+            "bbox": [
+              218,
+              40,
+              275,
+              335
+            ],
+            "confidence": 0.99
+          },
+          {
+            "visible_label": "outlook",
+            "visible_sublabel": "See more search results",
+            "target_type": "web_result",
+            "bbox": [
+              323,
+              40,
+              360,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook classic",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              360,
+              40,
+              398,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook login",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              398,
+              40,
+              436,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook 365",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              436,
+              40,
+              474,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "initial.outlookManifest",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              513,
+              40,
+              551,
+              335
+            ],
+            "confidence": 0.93
+          },
+          {
+            "visible_label": "multi-screen-ai-Automation",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              551,
+              40,
+              589,
+              335
+            ],
+            "confidence": 0.93
+          },
+          {
+            "visible_label": "ZSchema-browser-test",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              589,
+              40,
+              627,
+              335
+            ],
+            "confidence": 0.92
+          },
+          {
+            "visible_label": "ZSchema-browser-min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              627,
+              40,
+              665,
+              335
+            ],
+            "confidence": 0.92
+          },
+          {
+            "visible_label": "validator.min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              665,
+              40,
+              703,
+              335
+            ],
+            "confidence": 0.92
+          }
+        ]
+      },
+      {
+        "strategy": "D_candidate_list",
+        "case_id": "outlook_search_live_001",
+        "run_index": 2,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "candidates": [
+            {
+              "visible_label": "Outlook",
+              "visible_sublabel": "App",
+              "target_type": "desktop_app",
+              "bbox": [
+                218,
+                40,
+                275,
+                335
+              ],
+              "confidence": 0.99
+            },
+            {
+              "visible_label": "outlook",
+              "visible_sublabel": "See more search results",
+              "target_type": "web_result",
+              "bbox": [
+                318,
+                40,
+                360,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook classic",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                358,
+                40,
+                398,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook login",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                397,
+                40,
+                437,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook 365",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                436,
+                40,
+                476,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "initial.outlookManifest",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                513,
+                40,
+                553,
+                335
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "multi-screen-ai-Automation",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                552,
+                40,
+                592,
+                335
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "ZSchema-browser-test",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                591,
+                40,
+                631,
+                335
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "ZSchema-browser-min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                630,
+                40,
+                670,
+                335
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "validator.min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                669,
+                40,
+                709,
+                335
+              ],
+              "confidence": 0.94
+            }
+          ],
+          "reason": "I identified all visible result rows in the Windows Search UI. The 'Best match' section contains the Outlook desktop app entry. The 'Search the web' section contains four web search suggestion rows. The 'Documents' section contains five document entries (initial.outlookManifest, multi-screen-ai-Automation, ZSchema-browser-test, ZSchema-browser-min, validator.min). The Settings section heading is visible but its rows are cut off and not fully visible, so they are omitted. The right-side preview panel is excluded per instructions."
+        },
+        "validation_error": null,
+        "latency_ms": 11528.318699998636,
+        "input_tokens": 2281,
+        "output_tokens": 805,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          40,
+          275,
+          335
+        ],
+        "semantic_actual": {
+          "unique_desktop_app_match_found": true,
+          "match_count": 1,
+          "total_candidates_reported": 10
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.043457914768827606,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            40,
+            275,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": [
+          {
+            "visible_label": "Outlook",
+            "visible_sublabel": "App",
+            "target_type": "desktop_app",
+            "bbox": [
+              218,
+              40,
+              275,
+              335
+            ],
+            "confidence": 0.99
+          },
+          {
+            "visible_label": "outlook",
+            "visible_sublabel": "See more search results",
+            "target_type": "web_result",
+            "bbox": [
+              318,
+              40,
+              360,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook classic",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              358,
+              40,
+              398,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook login",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              397,
+              40,
+              437,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook 365",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              436,
+              40,
+              476,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "initial.outlookManifest",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              513,
+              40,
+              553,
+              335
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "multi-screen-ai-Automation",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              552,
+              40,
+              592,
+              335
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "ZSchema-browser-test",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              591,
+              40,
+              631,
+              335
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "ZSchema-browser-min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              630,
+              40,
+              670,
+              335
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "validator.min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              669,
+              40,
+              709,
+              335
+            ],
+            "confidence": 0.94
+          }
+        ]
+      },
+      {
+        "strategy": "D_candidate_list",
+        "case_id": "outlook_search_live_001",
+        "run_index": 3,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "candidates": [
+            {
+              "visible_label": "Outlook",
+              "visible_sublabel": "App",
+              "target_type": "desktop_app",
+              "bbox": [
+                218,
+                22,
+                275,
+                340
+              ],
+              "confidence": 0.98
+            },
+            {
+              "visible_label": "outlook",
+              "visible_sublabel": "See more search results",
+              "target_type": "web_result",
+              "bbox": [
+                320,
+                22,
+                360,
+                340
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "outlook classic",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                358,
+                22,
+                398,
+                340
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "outlook login",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                397,
+                22,
+                437,
+                340
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "outlook 365",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                436,
+                22,
+                476,
+                340
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "initial.outlookManifest",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                513,
+                22,
+                553,
+                340
+              ],
+              "confidence": 0.92
+            },
+            {
+              "visible_label": "multi-screen-ai-Automation",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                552,
+                22,
+                592,
+                340
+              ],
+              "confidence": 0.92
+            },
+            {
+              "visible_label": "ZSchema-browser-test",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                591,
+                22,
+                631,
+                340
+              ],
+              "confidence": 0.9
+            },
+            {
+              "visible_label": "ZSchema-browser-min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                630,
+                22,
+                670,
+                340
+              ],
+              "confidence": 0.9
+            },
+            {
+              "visible_label": "validator.min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                669,
+                22,
+                709,
+                340
+              ],
+              "confidence": 0.9
+            }
+          ],
+          "reason": "I identified all visible result rows in the Windows Search UI. The 'Best match' section contains one desktop app entry for Outlook. The 'Search the web' section contains three web result rows (outlook, outlook classic, outlook login, outlook 365). The 'Documents' section contains five document entries (initial.outlookManifest, multi-screen-ai-Automation, ZSchema-browser-test, ZSchema-browser-min, validator.min). The Settings section heading is visible but no individual settings rows are clearly visible/distinct enough to bound confidently. The right-side preview panel was excluded per instructions."
+        },
+        "validation_error": null,
+        "latency_ms": 11752.193899999838,
+        "input_tokens": 2281,
+        "output_tokens": 816,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          218,
+          22,
+          275,
+          340
+        ],
+        "semantic_actual": {
+          "unique_desktop_app_match_found": true,
+          "match_count": 1,
+          "total_candidates_reported": 10
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.045699329101356836,
+          "overlap_percentage": 0.09132996632996633,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            218,
+            22,
+            275,
+            340
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": [
+          {
+            "visible_label": "Outlook",
+            "visible_sublabel": "App",
+            "target_type": "desktop_app",
+            "bbox": [
+              218,
+              22,
+              275,
+              340
+            ],
+            "confidence": 0.98
+          },
+          {
+            "visible_label": "outlook",
+            "visible_sublabel": "See more search results",
+            "target_type": "web_result",
+            "bbox": [
+              320,
+              22,
+              360,
+              340
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "outlook classic",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              358,
+              22,
+              398,
+              340
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "outlook login",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              397,
+              22,
+              437,
+              340
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "outlook 365",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              436,
+              22,
+              476,
+              340
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "initial.outlookManifest",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              513,
+              22,
+              553,
+              340
+            ],
+            "confidence": 0.92
+          },
+          {
+            "visible_label": "multi-screen-ai-Automation",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              552,
+              22,
+              592,
+              340
+            ],
+            "confidence": 0.92
+          },
+          {
+            "visible_label": "ZSchema-browser-test",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              591,
+              22,
+              631,
+              340
+            ],
+            "confidence": 0.9
+          },
+          {
+            "visible_label": "ZSchema-browser-min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              630,
+              22,
+              670,
+              340
+            ],
+            "confidence": 0.9
+          },
+          {
+            "visible_label": "validator.min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              669,
+              22,
+              709,
+              340
+            ],
+            "confidence": 0.9
+          }
+        ]
+      },
+      {
+        "strategy": "D_candidate_list",
+        "case_id": "outlook_search_live_002",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "candidates": [
+            {
+              "visible_label": "Outlook",
+              "visible_sublabel": "App",
+              "target_type": "desktop_app",
+              "bbox": [
+                217,
+                40,
+                275,
+                340
+              ],
+              "confidence": 0.98
+            },
+            {
+              "visible_label": "outlook",
+              "visible_sublabel": "See more search results",
+              "target_type": "web_result",
+              "bbox": [
+                323,
+                40,
+                360,
+                340
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "outlook classic",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                360,
+                40,
+                398,
+                340
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "outlook login",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                398,
+                40,
+                436,
+                340
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "outlook 365",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                436,
+                40,
+                474,
+                340
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "initial.outlookManifest",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                513,
+                40,
+                553,
+                340
+              ],
+              "confidence": 0.92
+            },
+            {
+              "visible_label": "multi-screen-ai-Automation",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                553,
+                40,
+                593,
+                340
+              ],
+              "confidence": 0.92
+            },
+            {
+              "visible_label": "ZSchema-browser-test",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                593,
+                40,
+                631,
+                340
+              ],
+              "confidence": 0.92
+            },
+            {
+              "visible_label": "ZSchema-browser-min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                631,
+                40,
+                669,
+                340
+              ],
+              "confidence": 0.92
+            },
+            {
+              "visible_label": "validator.min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                669,
+                40,
+                707,
+                340
+              ],
+              "confidence": 0.9
+            }
+          ],
+          "reason": "I identified all visible search result rows in the Windows Search UI. The 'Best match' section contains one desktop app entry for Outlook. The 'Search the web' section contains four web result rows. The 'Documents' section contains five document entries. The right-side panel is excluded as it is a preview panel. Section headings are excluded. Bounding boxes are normalized to the 1920x1080 screenshot dimensions scaled to 0-1000."
+        },
+        "validation_error": null,
+        "latency_ms": 263376.3972000015,
+        "input_tokens": 2281,
+        "output_tokens": 782,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          217,
+          40,
+          275,
+          340
+        ],
+        "semantic_actual": {
+          "unique_desktop_app_match_found": true,
+          "match_count": 1,
+          "total_candidates_reported": 10
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.042679003645945034,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            217,
+            40,
+            275,
+            340
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": [
+          {
+            "visible_label": "Outlook",
+            "visible_sublabel": "App",
+            "target_type": "desktop_app",
+            "bbox": [
+              217,
+              40,
+              275,
+              340
+            ],
+            "confidence": 0.98
+          },
+          {
+            "visible_label": "outlook",
+            "visible_sublabel": "See more search results",
+            "target_type": "web_result",
+            "bbox": [
+              323,
+              40,
+              360,
+              340
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "outlook classic",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              360,
+              40,
+              398,
+              340
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "outlook login",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              398,
+              40,
+              436,
+              340
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "outlook 365",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              436,
+              40,
+              474,
+              340
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "initial.outlookManifest",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              513,
+              40,
+              553,
+              340
+            ],
+            "confidence": 0.92
+          },
+          {
+            "visible_label": "multi-screen-ai-Automation",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              553,
+              40,
+              593,
+              340
+            ],
+            "confidence": 0.92
+          },
+          {
+            "visible_label": "ZSchema-browser-test",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              593,
+              40,
+              631,
+              340
+            ],
+            "confidence": 0.92
+          },
+          {
+            "visible_label": "ZSchema-browser-min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              631,
+              40,
+              669,
+              340
+            ],
+            "confidence": 0.92
+          },
+          {
+            "visible_label": "validator.min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              669,
+              40,
+              707,
+              340
+            ],
+            "confidence": 0.9
+          }
+        ]
+      },
+      {
+        "strategy": "D_candidate_list",
+        "case_id": "outlook_search_live_003",
+        "run_index": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "provider_retries": 0,
+        "provider_error": null,
+        "schema_valid": true,
+        "parsed_json": {
+          "candidates": [
+            {
+              "visible_label": "Outlook",
+              "visible_sublabel": "App",
+              "target_type": "desktop_app",
+              "bbox": [
+                217,
+                40,
+                275,
+                335
+              ],
+              "confidence": 0.99
+            },
+            {
+              "visible_label": "outlook",
+              "visible_sublabel": "See more search results",
+              "target_type": "web_result",
+              "bbox": [
+                320,
+                40,
+                358,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook classic",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                358,
+                40,
+                397,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook login",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                397,
+                40,
+                436,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "outlook 365",
+              "visible_sublabel": "",
+              "target_type": "web_result",
+              "bbox": [
+                436,
+                40,
+                475,
+                335
+              ],
+              "confidence": 0.97
+            },
+            {
+              "visible_label": "initial.outlookManifest",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                513,
+                40,
+                552,
+                335
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "multi-screen-ai-Automation",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                552,
+                40,
+                591,
+                335
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "ZSchema-browser-test",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                591,
+                40,
+                630,
+                335
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "ZSchema-browser-min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                630,
+                40,
+                669,
+                335
+              ],
+              "confidence": 0.95
+            },
+            {
+              "visible_label": "validator.min",
+              "visible_sublabel": "",
+              "target_type": "other",
+              "bbox": [
+                669,
+                40,
+                708,
+                335
+              ],
+              "confidence": 0.95
+            }
+          ],
+          "reason": "I identified all visible search result rows in the Windows Search UI panel. The 'Best match' section contains the Outlook desktop app entry. The 'Search the web' section contains four web search suggestion rows. The 'Documents' section (labeled 8+) contains five document file entries. The Settings section heading is visible but no individual settings rows are fully visible with clear labels. The right-side preview panel was excluded. Section headings themselves were excluded. Bounding boxes are normalized to 0-1000 relative to the 1920x1080 screenshot dimensions."
+        },
+        "validation_error": null,
+        "latency_ms": 11794.902899999215,
+        "input_tokens": 2281,
+        "output_tokens": 805,
+        "estimated_cost": null,
+        "predicted_bbox": [
+          217,
+          40,
+          275,
+          335
+        ],
+        "semantic_actual": {
+          "unique_desktop_app_match_found": true,
+          "match_count": 1,
+          "total_candidates_reported": 10
+        },
+        "semantic_pass": true,
+        "grounding": {
+          "predicted_bbox_valid": true,
+          "expected_bbox_valid": true,
+          "predicted_center_inside_expected": false,
+          "expected_center_inside_predicted": false,
+          "iou": 0.04306160932331757,
+          "overlap_percentage": 0.08375420875420875,
+          "grounding_pass": false,
+          "high_quality_grounding": false,
+          "predicted_bbox": [
+            217,
+            40,
+            275,
+            335
+          ],
+          "expected_bbox": [
+            268.0,
+            8.0,
+            340.0,
+            239.0
+          ]
+        },
+        "component": null,
+        "candidates_reported": [
+          {
+            "visible_label": "Outlook",
+            "visible_sublabel": "App",
+            "target_type": "desktop_app",
+            "bbox": [
+              217,
+              40,
+              275,
+              335
+            ],
+            "confidence": 0.99
+          },
+          {
+            "visible_label": "outlook",
+            "visible_sublabel": "See more search results",
+            "target_type": "web_result",
+            "bbox": [
+              320,
+              40,
+              358,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook classic",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              358,
+              40,
+              397,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook login",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              397,
+              40,
+              436,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "outlook 365",
+            "visible_sublabel": "",
+            "target_type": "web_result",
+            "bbox": [
+              436,
+              40,
+              475,
+              335
+            ],
+            "confidence": 0.97
+          },
+          {
+            "visible_label": "initial.outlookManifest",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              513,
+              40,
+              552,
+              335
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "multi-screen-ai-Automation",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              552,
+              40,
+              591,
+              335
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "ZSchema-browser-test",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              591,
+              40,
+              630,
+              335
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "ZSchema-browser-min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              630,
+              40,
+              669,
+              335
+            ],
+            "confidence": 0.95
+          },
+          {
+            "visible_label": "validator.min",
+            "visible_sublabel": "",
+            "target_type": "other",
+            "bbox": [
+              669,
+              40,
+              708,
+              335
+            ],
+            "confidence": 0.95
+          }
+        ]
+      }
+    ]
+  },
+  "summary": {
+    "A_baseline_runtime_prompt": {
+      "strategy": "A_baseline_runtime_prompt",
+      "total_calls": 5,
+      "schema_valid_rate": "5/5",
+      "provider_error_rate": "0/5",
+      "semantic_accuracy": "5/5",
+      "grounding_pass": "0/5",
+      "high_quality_grounding": "0/5",
+      "center_in_target": "0/5",
+      "mean_iou": 0.043,
+      "median_iou": 0.043,
+      "latency": {
+        "count": 5,
+        "min_ms": 4353.2,
+        "max_ms": 10581.5,
+        "median_ms": 5352.9,
+        "avg_ms": 6220.4
+      },
+      "total_cost": null,
+      "cost_known_for_calls": 0
+    },
+    "B_landmark_relative_prompt": {
+      "strategy": "B_landmark_relative_prompt",
+      "total_calls": 5,
+      "schema_valid_rate": "5/5",
+      "provider_error_rate": "0/5",
+      "semantic_accuracy": "5/5",
+      "grounding_pass": "3/5",
+      "high_quality_grounding": "0/5",
+      "center_in_target": "3/5",
+      "mean_iou": 0.37,
+      "median_iou": 0.553,
+      "latency": {
+        "count": 5,
+        "min_ms": 5330.8,
+        "max_ms": 5948.3,
+        "median_ms": 5589.7,
+        "avg_ms": 5601.8
+      },
+      "total_cost": null,
+      "cost_known_for_calls": 0
+    },
+    "C_component_landmark_grounding": {
+      "strategy": "C_component_landmark_grounding",
+      "total_calls": 5,
+      "schema_valid_rate": "0/5",
+      "provider_error_rate": "0/5",
+      "semantic_accuracy": "n/a",
+      "grounding_pass": "n/a",
+      "high_quality_grounding": "n/a",
+      "center_in_target": "n/a",
+      "mean_iou": null,
+      "median_iou": null,
+      "latency": {
+        "count": 5,
+        "min_ms": 10661.0,
+        "max_ms": 14532.6,
+        "median_ms": 12048.0,
+        "avg_ms": 12504.1
+      },
+      "total_cost": null,
+      "cost_known_for_calls": 0
+    },
+    "D_candidate_list": {
+      "strategy": "D_candidate_list",
+      "total_calls": 5,
+      "schema_valid_rate": "5/5",
+      "provider_error_rate": "0/5",
+      "semantic_accuracy": "5/5",
+      "grounding_pass": "0/5",
+      "high_quality_grounding": "0/5",
+      "center_in_target": "0/5",
+      "mean_iou": 0.044,
+      "median_iou": 0.043,
+      "latency": {
+        "count": 5,
+        "min_ms": 11081.4,
+        "max_ms": 263376.4,
+        "median_ms": 11752.2,
+        "avg_ms": 61906.6
+      },
+      "total_cost": null,
+      "cost_known_for_calls": 0
+    }
+  },
+  "consistency": {
+    "A_baseline_runtime_prompt": {
+      "runs": 3,
+      "applicable": true,
+      "semantic_pass_consistent": true,
+      "bbox_pairwise_min_iou": 1.0,
+      "bbox_pairwise_avg_iou": 1.0,
+      "confidence_spread": 0.0
+    },
+    "B_landmark_relative_prompt": {
+      "runs": 3,
+      "applicable": true,
+      "semantic_pass_consistent": true,
+      "bbox_pairwise_min_iou": 0.082,
+      "bbox_pairwise_avg_iou": 0.372,
+      "confidence_spread": 0.02
+    },
+    "C_component_landmark_grounding": {
+      "runs": 3,
+      "applicable": true,
+      "semantic_pass_consistent": true,
+      "bbox_pairwise_min_iou": null,
+      "bbox_pairwise_avg_iou": null,
+      "confidence_spread": null
+    },
+    "D_candidate_list": {
+      "runs": 3,
+      "applicable": true,
+      "semantic_pass_consistent": true,
+      "bbox_pairwise_min_iou": 0.928,
+      "bbox_pairwise_avg_iou": 0.952,
+      "confidence_spread": null
+    }
+  },
+  "component_special_metrics": {}
+}

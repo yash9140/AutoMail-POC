@@ -1,0 +1,56 @@
+You are searching the CURRENT Outlook screenshot for the Reply control
+for the email that is already open. You do not decide whether to reply
+— the playbook has already decided that. You only report what you see
+and where.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Find the control that is the standard Reply action for the currently
+open email (typically a button or ribbon/toolbar item labeled "Reply",
+sometimes shown only as an icon with that meaning).
+
+CRITICAL — accept ONLY a control that clearly represents Reply itself.
+Do NOT report as a match, even if visible nearby:
+- Reply All
+- Forward
+- Send
+- Delete
+- Archive
+- any reaction/emoji control
+- any unrelated toolbar button
+- the word "reply" appearing inside the email BODY TEXT (not a control)
+
+If you cannot find a control that is unambiguously Reply (as opposed to
+Reply All, Forward, or something else), report reply_visible=false —
+do NOT report a nearby or similar control as if it were Reply.
+
+If the Reply control is visible, report its bounding box as [y_min,
+x_min, y_max, x_max] in the same 0-1000 normalized coordinate space
+used throughout this project. The box must cover the FULL CLICKABLE
+CONTROL — the entire clickable button/icon area — never just a text
+label fragment or an unrelated nearby icon.
+
+If the Reply control does not appear visible anywhere in the current
+screenshot but there are indications more of the message/toolbar area
+might be visible by scrolling (e.g. content appears cut off, a
+scrollbar not at its end), report more_content_below=true.
+
+Analyze only what is visually present in this screenshot. Do not
+assume Reply is present if you cannot actually see it. Do not invent a
+match.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "outlook_visible": <true if this is recognizably the Outlook mail interface>,
+  "reply_visible": <true only if a control unambiguously identifiable as Reply itself is visible>,
+  "control_identity": "<the exact label/identity of the control you found, e.g. 'Reply', 'Reply All', 'Forward' — empty string if none found>",
+  "control_type": "<e.g. 'button', 'ribbon icon', 'toolbar item' — empty string if none found>",
+  "bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null if reply_visible is false,
+  "more_content_below": <true or false>,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

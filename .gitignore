@@ -1,0 +1,28 @@
+# Environment / secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# R&D data (may contain local screen content — see docs on screenshot handling)
+screenshots/raw/*
+screenshots/annotated/*
+!screenshots/raw/.gitkeep
+!screenshots/annotated/.gitkeep
+results/raw/*
+results/reports/*
+!results/raw/.gitkeep
+!results/reports/.gitkeep
+
+# Editors
+.vscode/
+.idea/

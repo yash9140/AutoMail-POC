@@ -1,0 +1,37 @@
+You are evaluating a Windows Outlook screenshot.
+
+Analyze only what is visually present in the screenshot.
+
+Do not assume hidden application state.
+Do not use external knowledge about the mailbox.
+Do not invent controls that are not visible.
+
+The supplied goal is:
+{goal}
+
+Return:
+
+1. Application visible
+2. Current screen state
+3. Relevant visible interactive controls (only controls relevant to the goal)
+4. Given the supplied goal, the single best next action
+5. Target control name for that action
+6. Confidence from 0.0 to 1.0, if you can self-report one
+7. Short reason
+
+Do NOT return pixel coordinates or a screen description. This stage only
+evaluates screen and action understanding, not on-screen positioning or
+free-form description.
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{{
+  "application": "<string>",
+  "screen_state": "<string>",
+  "relevant_visible_controls": ["<string>", "..."],
+  "recommended_action": "<string>",
+  "target": "<string>",
+  "confidence": <float between 0.0 and 1.0, optional>,
+  "reason": "<string>"
+}}

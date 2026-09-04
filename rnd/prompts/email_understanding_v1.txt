@@ -1,0 +1,16 @@
+You are reading an email currently open in Microsoft Outlook.
+
+Analyze only what is visually present in the screenshot. Do not assume
+anything about the sender, mailbox, or context beyond what is shown.
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{
+  "email_summary": "<a short, neutral summary of what the email says>",
+  "sender_intent": "<what the sender appears to want, in your own words>",
+  "requires_reply": <true or false>,
+  "requested_action": "<the specific action or response the sender seems to be asking for, or an empty string if none>",
+  "important_points": ["<point 1>", "<point 2>", "..."],
+  "confidence": <float between 0.0 and 1.0>
+}

@@ -1,0 +1,65 @@
+{
+  "note": "Manually verified pricing only. Do not add an entry without a real source. estimated_cost is left null in results when no entry exists here for the provider/model actually used.",
+  "models": [
+    {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "pricing_date": "2026-08-27",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing (fetched 2026-08-27)",
+      "tier": "standard (non-batch) paid tier",
+      "input_rate_per_million_tokens": 0.30,
+      "output_rate_per_million_tokens": 2.50,
+      "notes": "RETIRED for new users as of 2026-08-27 (API returned HTTP 404 during RND-003's first live call attempt) — this entry is kept only as a historical/reference record, not for active use. Input rate of $0.30/1M applied to text/image/video input; audio was billed separately at $1.00/1M."
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "pricing_date": "2026-08-27",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing (fetched 2026-08-27)",
+      "tier": "standard (non-batch) paid tier, promotional rate through 2026-12-31",
+      "input_rate_per_million_tokens": 0.75,
+      "output_rate_per_million_tokens": 3.75,
+      "notes": "Rate applies uniformly across text/image/video/audio input. Pricing page states this rate holds through 2026-12-31, after which it rises to $1.50 input / $7.50 output per 1M tokens starting 2027-01-01 — this entry must be re-verified and updated after that date."
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "pricing_date": "2026-08-28",
+      "source": "https://developers.openai.com/api/docs/pricing (fetched 2026-08-28)",
+      "tier": "standard (non-batch, non-fast-mode)",
+      "input_rate_per_million_tokens": 2.50,
+      "output_rate_per_million_tokens": 10.00,
+      "notes": "Confirmed still an active, available model as of fetch date. Batch tier is $1.25/$5.00; fast mode is $4.25/$17.00 — neither used by this project's synchronous single-call experiments."
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-4",
+      "pricing_date": "2026-08-28",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-08-28)",
+      "tier": "standard (non-batch)",
+      "input_rate_per_million_tokens": 15.00,
+      "output_rate_per_million_tokens": 75.00,
+      "notes": "IMPORTANT: Anthropic's own pricing page lists this model as 'retired, except on Google Cloud' as of the fetch date. This entry is recorded for reference/traceability only — the direct Anthropic API call in this readiness stage may fail with an invalid/unavailable-model error, matching what happened with gemini-2.5-flash in RND-003. Do not assume this model works without confirming via a real API response."
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "pricing_date": "2026-08-28",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-08-28)",
+      "tier": "standard (non-batch)",
+      "input_rate_per_million_tokens": 2.00,
+      "output_rate_per_million_tokens": 10.00,
+      "notes": "Confirmed active model as of fetch date. Page notes the $2/$10 rate was originally introductory through 2026-08-31 but is now the permanent standard price (the previously scheduled increase to $3/$15 will not occur). Reconfigured from claude-opus-4 (retired) to this model for the readiness check after user review."
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "pricing_date": "2026-08-28",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-08-28) — pricing row for 'Claude Sonnet 4', which lists this dated snapshot as retired except on Bedrock/Google Cloud",
+      "tier": "standard (non-batch)",
+      "input_rate_per_million_tokens": 3.00,
+      "output_rate_per_million_tokens": 15.00,
+      "notes": "The undated 'Claude Sonnet 4' family is listed as retired on the direct API except via Bedrock/Google Cloud. This dated snapshot (2025-05-14) was configured by the user with a new organization's billing; whether it still resolves via the direct Anthropic API is confirmed only by the actual call result, not assumed here. Rate used is the last known 'Claude Sonnet 4' standard pricing from the same verified source as the other Anthropic entries."
+    }
+  ]
+}

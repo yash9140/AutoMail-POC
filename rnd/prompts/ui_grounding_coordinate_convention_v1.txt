@@ -1,0 +1,36 @@
+You are locating a single UI control in a Windows Outlook screenshot.
+
+This is a Microsoft Outlook screenshot.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Locate the visible "{target}" control and return one point inside its
+main clickable area.
+
+Analyze only what is visually present in the screenshot.
+Do not assume hidden application state.
+Do not invent a control that is not visible.
+
+Origin (0,0) is the top-left corner of the image. x increases left to
+right. y increases top to bottom.
+
+State clearly whether x/y are native image pixels, normalized
+coordinates, or another coordinate system. If your coordinates are on a
+scale other than the image's own pixel dimensions, say what that scale
+is (for example, but not limited to, "0 to 1000" or "0 to 1").
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{{
+  "target": "{target}",
+  "x": <number>,
+  "y": <number>,
+  "coordinate_system": "<describe the coordinate system your x/y are expressed in, e.g. 'native image pixels' or 'normalized 0-1000' or 'normalized 0-1', in your own words>",
+  "coordinate_range_x": "<the minimum and maximum value x could take in your coordinate system, e.g. '0 to {width}' or '0 to 1000'>",
+  "coordinate_range_y": "<the minimum and maximum value y could take in your coordinate system, e.g. '0 to {height}' or '0 to 1000'>",
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

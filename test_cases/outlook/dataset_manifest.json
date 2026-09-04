@@ -1,0 +1,326 @@
+{
+  "dataset_id": "outlook-vision-poc-dataset-v1",
+  "created": "2026-08-27",
+  "state_vocabulary": [
+    "dialog_or_overlay",
+    "email_open",
+    "inbox",
+    "outlook_closed",
+    "outlook_home",
+    "reply_editor_open",
+    "sending",
+    "sent_or_post_send",
+    "unknown"
+  ],
+  "action_vocabulary": [
+    "click_reply",
+    "click_send",
+    "focus_reply_editor",
+    "open_outlook",
+    "select_existing_email",
+    "stop",
+    "type_reply",
+    "verify_sent",
+    "wait"
+  ],
+  "cases": [
+    {
+      "test_id": "OUTLOOK-001",
+      "filename": "screen_20260827_152852_448.png",
+      "status": "captured",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "inbox",
+        "recommended_action": "select_existing_email"
+      },
+      "targets": [
+        {
+          "name": "email_row",
+          "type": "row",
+          "bbox": {
+            "x1": 328,
+            "y1": 304,
+            "x2": 744,
+            "y2": 404
+          }
+        }
+      ],
+      "notes": "Inbox normal \u2014 message list visible, no email actively open. Annotate at least one existing test email row when captured. ATTEMPT 1 INVALID (2026-08-27T15:20:14): foreground application was VS Code, not Outlook \u2014 capture was taken before Outlook was confirmed as the active window. Excluded from dataset; moved to screenshots/raw/invalid/OUTLOOK-001_attempt1_INVALID_vscode_foreground.png. See results/raw/rnd002_invalid_attempts.json and docs/04_Outlook_Screenshot_Dataset.md. Retake required.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-002",
+      "filename": "screen_20260827_163644_784.png",
+      "status": "captured",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "email_open",
+        "recommended_action": "click_reply"
+      },
+      "targets": [],
+      "email": {
+        "test_email_id": null,
+        "subject": "MailFlow POC Test Email"
+      },
+      "notes": "Existing email selected/open, body visible. Human-confirmed: subject is 'MailFlow POC Test Email' (a real pre-existing email in the test mailbox, NOT the synthetic EMAIL-A/B/C set \u2014 do not conflate). Reply button confirmed visible near the bottom of the opened email pane (no bounding box annotated here; Reply gets its bbox in OUTLOOK-003).",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-003",
+      "filename": "screen_20260827_164739_324.png",
+      "status": "captured",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "email_open",
+        "recommended_action": "click_reply"
+      },
+      "targets": [
+        {
+          "name": "Reply",
+          "type": "button",
+          "bbox": {
+            "x1": 866,
+            "y1": 664,
+            "x2": 973,
+            "y2": 702
+          }
+        }
+      ],
+      "email": {
+        "test_email_id": null,
+        "subject": "MailFlow POC Test Email"
+      },
+      "notes": "Reply control clearly visible. Same real pre-existing test-mailbox email as OUTLOOK-002 ('MailFlow POC Test Email'), not synthetic EMAIL-A. Reply bounding box annotated. Forward was also visible but intentionally not annotated this round (human instruction: Reply only, as primary target). Reply All was NOT visible/present and is correctly not recorded.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-004",
+      "filename": "screen_20260827_165406_262.png",
+      "status": "captured",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "reply_editor_open",
+        "recommended_action": "focus_reply_editor"
+      },
+      "targets": [
+        {
+          "name": "reply_editor",
+          "type": "text_area",
+          "bbox": {
+            "x1": 788,
+            "y1": 796,
+            "x2": 1832,
+            "y2": 962
+          }
+        }
+      ],
+      "email": {
+        "test_email_id": null,
+        "subject": "MailFlow POC Test Email"
+      },
+      "notes": "Reply editor open after manually clicking Reply. Same real pre-existing test-mailbox email as OUTLOOK-002/003 ('MailFlow POC Test Email'), not synthetic EMAIL-A. Reply text-entry area bounding box annotated.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-005",
+      "filename": "screen_20260827_165946_191.png",
+      "status": "captured",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "reply_editor_open",
+        "recommended_action": "click_send"
+      },
+      "targets": [
+        {
+          "name": "Send",
+          "type": "button",
+          "bbox": {
+            "x1": 800,
+            "y1": 1022,
+            "x2": 902,
+            "y2": 1060
+          }
+        }
+      ],
+      "email": {
+        "test_email_id": null,
+        "subject": "MailFlow POC Test Email"
+      },
+      "notes": "Reply editor open with Send control visible. Same real pre-existing test-mailbox email as OUTLOOK-002/003/004 ('MailFlow POC Test Email'), not synthetic EMAIL-A. Send bounding box annotated (human-confirmed correct). No email was sent during this capture.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-006",
+      "filename": "screen_20260827_172436_226.png",
+      "status": "captured",
+      "window_mode": "maximized",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "inbox"
+      },
+      "targets": [],
+      "notes": "Outlook maximized, inbox or email-open state.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-007",
+      "filename": "screen_20260827_173334_423.png",
+      "status": "captured",
+      "window_mode": "resized",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "inbox"
+      },
+      "targets": [],
+      "notes": "Outlook resized to a visibly different window size than OUTLOOK-006, to test whether grounding stays reliable when control positions shift.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-008",
+      "filename": "screen_20260827_174500_164.png",
+      "status": "captured",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "email_open",
+        "recommended_action": "click_reply"
+      },
+      "targets": [],
+      "email": {
+        "test_email_id": null,
+        "subject": "Mail for project"
+      },
+      "notes": "A different existing email than OUTLOOK-002/003/004/005 ('MailFlow POC Test Email'), not synthetic EMAIL-C. Attempt 1 (subject 'Joining Letter and Bond Lette[r]') was rejected before annotation for containing likely HR/onboarding-sensitive content \u2014 see results/raw/rnd002_invalid_attempts.json. This retake's subject 'Mail for project' was human-confirmed non-sensitive.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-009",
+      "filename": "screen_20260827_175331_081.png",
+      "status": "captured",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "email_open"
+      },
+      "targets": [],
+      "email": {
+        "test_email_id": null,
+        "length_class": "long",
+        "subject": "Important Update Regarding Current Work and Next Steps"
+      },
+      "notes": "Long email body with multiple paragraphs, human-confirmed non-sensitive. Real pre-existing test-mailbox email, not synthetic EMAIL-B.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-010",
+      "filename": "screen_20260827_175843_034.png",
+      "status": "captured",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "email_open"
+      },
+      "targets": [],
+      "email": {
+        "test_email_id": null,
+        "length_class": "short",
+        "subject": "Mail for project"
+      },
+      "notes": "Short email body, human-confirmed non-sensitive. INTENTIONALLY reuses the same real 'Mail for project' email as OUTLOOK-008 (same account, no other clearly non-sensitive email was available) \u2014 this is NOT a different email sample, do not treat OUTLOOK-008 and OUTLOOK-010 as independent email content for any 'different examples' evaluation later. Not synthetic EMAIL-A.",
+      "screen": {
+        "width": 1920,
+        "height": 1080,
+        "windows_scaling_percent": 125
+      }
+    },
+    {
+      "test_id": "OUTLOOK-011",
+      "filename": null,
+      "status": "skipped",
+      "skip_reason": "No natural popup/notification/overlay available during the capture session; no artificial popup was created.",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "dialog_or_overlay"
+      },
+      "targets": [],
+      "notes": "Popup / notification / overlay, only if one naturally and safely occurs. Do not artificially manipulate Windows into an unsafe state to produce this. Human-confirmed none was available; correctly skipped rather than fabricated."
+    },
+    {
+      "test_id": "OUTLOOK-012",
+      "filename": null,
+      "status": "planned",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "email_open"
+      },
+      "targets": [],
+      "notes": "OPTIONAL. Reply All and Reply both visible in the same view."
+    },
+    {
+      "test_id": "OUTLOOK-013",
+      "filename": null,
+      "status": "planned",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "email_open"
+      },
+      "targets": [],
+      "notes": "OPTIONAL. Conversation/thread view."
+    },
+    {
+      "test_id": "OUTLOOK-014",
+      "filename": null,
+      "status": "planned",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "email_open"
+      },
+      "targets": [],
+      "notes": "OPTIONAL. Email with a scrollable body."
+    },
+    {
+      "test_id": "OUTLOOK-015",
+      "filename": null,
+      "status": "planned",
+      "expected": {
+        "application": "Microsoft Outlook",
+        "state": "reply_editor_open"
+      },
+      "targets": [],
+      "notes": "OPTIONAL. Reply editor with some draft text already present."
+    }
+  ]
+}

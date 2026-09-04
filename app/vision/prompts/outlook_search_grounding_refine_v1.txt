@@ -1,0 +1,43 @@
+This is the SAME screenshot you were just shown. You previously
+identified a Windows Search result with:
+  visible_label = "{visible_label}"
+  visible_sublabel = "{visible_sublabel}"
+
+but were not confident the bounding box you reported was tightly
+scoped to just that one clickable row — it may have also included the
+"Best match" section heading, extra whitespace, or the container
+around it.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Look again at THIS screenshot only. Find that same result — the row
+containing the icon, the label "{visible_label}", and the sublabel
+"{visible_sublabel}" (if it was visible) — and report ONLY a tight
+bounding box for that ONE row.
+
+The bbox must contain ONLY the icon + label + sublabel of that row —
+NOT the "Best match" heading above it, NOT any other section title,
+NOT surrounding whitespace, NOT the container/panel around it, and NOT
+more than that one row.
+
+If you still cannot confidently localize a tight box for just that
+row, report target_visible as false and bbox as null — do not guess or
+fabricate coordinates just to produce an answer.
+
+COORDINATE CONTRACT (same as before): bbox = [y_min, x_min, y_max,
+x_max], all four values integers normalized 0-1000 relative to THIS
+screenshot (x=0 left edge, x=1000 right edge, y=0 top edge, y=1000
+bottom edge). Never a single point, never native pixel coordinates,
+never [x_min, y_min, x_max, y_max] order.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "target_visible": <true only if you can confidently localize a tight bbox for that row, false otherwise>,
+  "bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null if target_visible is false,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

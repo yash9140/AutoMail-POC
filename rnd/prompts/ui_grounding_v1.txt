@@ -1,0 +1,30 @@
+You are locating a single UI control in a Windows Outlook screenshot.
+
+This is a Microsoft Outlook screenshot.
+
+Original screenshot dimensions: {width} x {height} pixels.
+
+Locate the visible "{target}" control and return one point inside its
+main clickable area.
+
+Analyze only what is visually present in the screenshot.
+Do not assume hidden application state.
+Do not invent a control that is not visible — if it is not visible, say so
+in the reason and give your best-guess location with low confidence.
+
+Coordinate system:
+- top-left = (0,0)
+- x increases left to right
+- y increases top to bottom
+- coordinates must be within the {width} x {height} image bounds
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{{
+  "target": "{target}",
+  "x": <integer>,
+  "y": <integer>,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

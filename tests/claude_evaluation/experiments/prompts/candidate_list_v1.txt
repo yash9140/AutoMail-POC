@@ -1,0 +1,62 @@
+You are looking at a Windows 11 desktop screenshot taken immediately
+after the Windows Search UI was opened and the text "Outlook" was
+typed into the search box. You do not decide what to do next — only
+report what you see and where. This is an EVALUATION-ONLY experiment:
+your answer is never used to click anything.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Analyze only what is visually present in THIS screenshot. Do not
+assume hidden application state. Do not invent a result that is not
+visible.
+
+List EVERY individual, clearly visible search-result row/tile/entry
+you can see anywhere in the search results area — the "Best match"
+result, anything under "Search the web", anything under "Documents",
+anything under "Settings", anything else. Do NOT skip any just because
+you're unsure whether it's the right one — report everything you see,
+and let each one speak for itself. Do NOT include the search input box
+itself, section heading text ("Best match", "Search the web", etc. are
+not candidates), or the right-side preview/details panel — only actual
+listed result rows.
+
+For EACH candidate row, report:
+- visible_label: the exact primary label text of that row, verbatim
+- visible_sublabel: the exact secondary/sub label text of that row, if
+  any (e.g. "App", or a URL, or empty string if none)
+- target_type: your classification of that ONE row —
+  "desktop_app" | "web_result" | "settings" | "help" | "other"
+- bbox: a tight bounding box around just that ONE row/tile — the whole
+  clickable area for it — never including any section heading above
+  or below it, never spanning more than that one row
+
+COORDINATE CONTRACT — the ONLY accepted format for every bbox:
+
+[y_min, x_min, y_max, x_max], where:
+- ALL four values are integers in the normalized range 0-1000
+- x=0 is the LEFT edge of THIS screenshot, x=1000 is the RIGHT edge
+- y=0 is the TOP edge of THIS screenshot, y=1000 is the BOTTOM edge
+- relative to the EXACT screenshot supplied above, never any other
+  screen/monitor/resolution
+
+Do not guess a bbox you are not confident about — if you cannot
+confidently bound one candidate's row, omit that candidate rather than
+report an inaccurate box for it.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "candidates": [
+    {{
+      "visible_label": "<string>",
+      "visible_sublabel": "<string, empty if none>",
+      "target_type": "<desktop_app | web_result | settings | help | other>",
+      "bbox": [<y_min>, <x_min>, <y_max>, <x_max>],
+      "confidence": <float between 0.0 and 1.0>
+    }}
+  ],
+  "reason": "<string>"
+}}

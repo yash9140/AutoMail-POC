@@ -1,0 +1,286 @@
+{
+  "timestamp": "2026-09-02T23:36:47.438750",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "args": {
+    "stage": "OUTLOOK_SEARCH",
+    "case": null,
+    "runs": 1
+  },
+  "cases": [
+    {
+      "case_id": "outlook_search_live_001",
+      "stage": "OUTLOOK_SEARCH",
+      "notes": "Live capture 2026-09-02 23:09:38 \u2014 the run whose debug overlay first showed the header/panel bbox-scoping bug.",
+      "runs": [
+        {
+          "case_id": "outlook_search_live_001",
+          "stage": "OUTLOOK_SEARCH",
+          "run_index": 1,
+          "screenshot": "tests\\claude_evaluation\\screenshots\\outlook_search\\outlook_search_live_001.png",
+          "screenshot_width": 1920,
+          "screenshot_height": 1080,
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-6",
+          "provider_retries": 0,
+          "provider_error": null,
+          "schema_valid": true,
+          "parsed_json": {
+            "search_visible": true,
+            "target_visible": true,
+            "target_type": "desktop_app",
+            "visible_label": "Outlook",
+            "visible_sublabel": "App",
+            "bbox": [
+              218,
+              40,
+              275,
+              335
+            ],
+            "bbox_tightly_scoped": true,
+            "confidence": 0.97,
+            "reason": "The Windows Search UI is open with 'Outlook' typed. Under the 'Best match' section, there is a single clickable row showing the Outlook icon with label 'Outlook' and sublabel 'App'. This is the desktop application result. The bbox is tightly scoped to just the icon+label+sublabel row, starting below the 'Best match' heading text."
+          },
+          "validation_error": null,
+          "latency_ms": 5163.8613999984955,
+          "input_tokens": 3212,
+          "output_tokens": 194,
+          "estimated_cost": null,
+          "semantic": {
+            "pass": true,
+            "expected": {
+              "search_visible": true,
+              "target_visible": true,
+              "target_type": "desktop_app",
+              "visible_label": "Outlook",
+              "visible_sublabel": "App"
+            },
+            "actual": {
+              "search_visible": true,
+              "target_visible": true,
+              "target_type": "desktop_app",
+              "visible_label": "Outlook",
+              "visible_sublabel": "App"
+            }
+          },
+          "grounding": {
+            "predicted_bbox_valid": true,
+            "expected_bbox_valid": true,
+            "predicted_center_inside_expected": false,
+            "expected_center_inside_predicted": false,
+            "iou": 0.043457914768827606,
+            "overlap_percentage": 0.08375420875420875,
+            "grounding_pass": false,
+            "high_quality_grounding": false,
+            "predicted_bbox": [
+              218,
+              40,
+              275,
+              335
+            ],
+            "expected_bbox": [
+              268.0,
+              8.0,
+              340.0,
+              239.0
+            ]
+          },
+          "raw_text_length": 588
+        }
+      ],
+      "consistency": {
+        "runs": 1,
+        "applicable": false
+      }
+    },
+    {
+      "case_id": "outlook_search_live_002",
+      "stage": "OUTLOOK_SEARCH",
+      "notes": "Live capture 2026-09-02 22:35:08 \u2014 same session, an earlier attempt; pixel-identical search-panel region (diff-checked).",
+      "runs": [
+        {
+          "case_id": "outlook_search_live_002",
+          "stage": "OUTLOOK_SEARCH",
+          "run_index": 1,
+          "screenshot": "tests\\claude_evaluation\\screenshots\\outlook_search\\outlook_search_live_002.png",
+          "screenshot_width": 1920,
+          "screenshot_height": 1080,
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-6",
+          "provider_retries": 0,
+          "provider_error": null,
+          "schema_valid": true,
+          "parsed_json": {
+            "search_visible": true,
+            "target_visible": true,
+            "target_type": "desktop_app",
+            "visible_label": "Outlook",
+            "visible_sublabel": "App",
+            "bbox": [
+              218,
+              40,
+              275,
+              335
+            ],
+            "bbox_tightly_scoped": true,
+            "confidence": 0.97,
+            "reason": "The Windows Search UI is open with 'Outlook' typed. Under the 'Best match' section, there is a single clickable row showing the Outlook app icon alongside the label 'Outlook' and sublabel 'App'. This is the left-side result row, distinct from the right-side preview panel. The bbox is tightly scoped to just that row, starting below the 'Best match' heading."
+          },
+          "validation_error": null,
+          "latency_ms": 4881.68990000122,
+          "input_tokens": 3212,
+          "output_tokens": 200,
+          "estimated_cost": null,
+          "semantic": {
+            "pass": true,
+            "expected": {
+              "search_visible": true,
+              "target_visible": true,
+              "target_type": "desktop_app",
+              "visible_label": "Outlook",
+              "visible_sublabel": "App"
+            },
+            "actual": {
+              "search_visible": true,
+              "target_visible": true,
+              "target_type": "desktop_app",
+              "visible_label": "Outlook",
+              "visible_sublabel": "App"
+            }
+          },
+          "grounding": {
+            "predicted_bbox_valid": true,
+            "expected_bbox_valid": true,
+            "predicted_center_inside_expected": false,
+            "expected_center_inside_predicted": false,
+            "iou": 0.043457914768827606,
+            "overlap_percentage": 0.08375420875420875,
+            "grounding_pass": false,
+            "high_quality_grounding": false,
+            "predicted_bbox": [
+              218,
+              40,
+              275,
+              335
+            ],
+            "expected_bbox": [
+              268.0,
+              8.0,
+              340.0,
+              239.0
+            ]
+          },
+          "raw_text_length": 615
+        }
+      ],
+      "consistency": {
+        "runs": 1,
+        "applicable": false
+      }
+    },
+    {
+      "case_id": "outlook_search_live_003",
+      "stage": "OUTLOOK_SEARCH",
+      "notes": "Live capture 2026-09-02 22:56:01 \u2014 same session, a third attempt; pixel-identical search-panel region (diff-checked).",
+      "runs": [
+        {
+          "case_id": "outlook_search_live_003",
+          "stage": "OUTLOOK_SEARCH",
+          "run_index": 1,
+          "screenshot": "tests\\claude_evaluation\\screenshots\\outlook_search\\outlook_search_live_003.png",
+          "screenshot_width": 1920,
+          "screenshot_height": 1080,
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-6",
+          "provider_retries": 0,
+          "provider_error": null,
+          "schema_valid": true,
+          "parsed_json": {
+            "search_visible": true,
+            "target_visible": true,
+            "target_type": "desktop_app",
+            "visible_label": "Outlook",
+            "visible_sublabel": "App",
+            "bbox": [
+              218,
+              40,
+              275,
+              340
+            ],
+            "bbox_tightly_scoped": true,
+            "confidence": 0.97,
+            "reason": "The Windows Search UI is open with 'Outlook' typed. Under the 'Best match' section, there is a single clickable row showing the Outlook icon alongside 'Outlook' and 'App' as sublabel. This is the left-side result row (not the right-side preview panel). The bbox is drawn tightly around just that row, starting below the 'Best match' heading."
+          },
+          "validation_error": null,
+          "latency_ms": 5074.908799999321,
+          "input_tokens": 3212,
+          "output_tokens": 197,
+          "estimated_cost": null,
+          "semantic": {
+            "pass": true,
+            "expected": {
+              "search_visible": true,
+              "target_visible": true,
+              "target_type": "desktop_app",
+              "visible_label": "Outlook",
+              "visible_sublabel": "App"
+            },
+            "actual": {
+              "search_visible": true,
+              "target_visible": true,
+              "target_type": "desktop_app",
+              "visible_label": "Outlook",
+              "visible_sublabel": "App"
+            }
+          },
+          "grounding": {
+            "predicted_bbox_valid": true,
+            "expected_bbox_valid": true,
+            "predicted_center_inside_expected": false,
+            "expected_center_inside_predicted": false,
+            "iou": 0.04307492501314203,
+            "overlap_percentage": 0.08375420875420875,
+            "grounding_pass": false,
+            "high_quality_grounding": false,
+            "predicted_bbox": [
+              218,
+              40,
+              275,
+              340
+            ],
+            "expected_bbox": [
+              268.0,
+              8.0,
+              340.0,
+              239.0
+            ]
+          },
+          "raw_text_length": 598
+        }
+      ],
+      "consistency": {
+        "runs": 1,
+        "applicable": false
+      }
+    }
+  ],
+  "stage_summary": {
+    "OUTLOOK_SEARCH": {
+      "total_calls": 3,
+      "schema_valid_rate": "3/3",
+      "provider_error_rate": "0/3",
+      "semantic_accuracy": "3/3",
+      "grounding_pass": "0/3",
+      "high_quality_grounding": "0/3",
+      "latency": {
+        "count": 3,
+        "min_ms": 4881.7,
+        "max_ms": 5163.9,
+        "median_ms": 5074.9,
+        "avg_ms": 5040.2
+      },
+      "total_cost": null,
+      "cost_known_for_calls": 0
+    }
+  }
+}

@@ -1,0 +1,11 @@
+mss
+Pillow
+pyautogui
+python-dotenv
+pydantic
+pytest
+pytest-qt
+PySide6
+google-genai
+openai
+anthropic

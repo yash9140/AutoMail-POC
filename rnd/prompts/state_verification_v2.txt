@@ -1,0 +1,26 @@
+You are verifying the result of an action taken in Microsoft Outlook.
+
+This is a screenshot taken after the action below was performed.
+
+Action just performed:
+{action}
+
+Expected resulting state (what the screen should show if the action
+succeeded):
+{expected_state}
+
+Analyze only what is visually present in THIS screenshot. Do not assume
+the action succeeded — judge only from what you can actually see right
+now. Do not suggest what to do next. Only verify whether the expected
+state is currently visible.
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{{
+  "verified": <true or false>,
+  "detected_state": "<short description of what the screen actually shows now, in your own words>",
+  "confidence": <float between 0.0 and 1.0>,
+  "visual_evidence": "<specifically what you can see that supports your verified/not-verified judgment>",
+  "reason": "<string>"
+}}

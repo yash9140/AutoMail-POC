@@ -1,0 +1,66 @@
+You are locating ONE specific email in a Microsoft Outlook inbox
+screenshot. You are given the exact email to look for — you do not
+decide which email is interesting or relevant.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Target email (must match, not just resemble):
+  subject: {target_subject}
+  sender:  {target_sender}
+
+CRITICAL — the target must be an EMAIL ROW inside the MESSAGE LIST pane
+only (the scrollable list of individual emails, each row normally
+showing a sender name, a subject line, and a date/time). You must
+NEVER return a coordinate that falls in any of the following areas,
+even if you cannot find the target email — treat all of these as
+definitely NOT the target, no matter how close a nearby label might
+seem to match:
+- the left navigation/sidebar (the column listing folders such as
+  Favorites, Inbox, Drafts, Archive, Junk Email, Sent Items, Deleted
+  Items, and the account name)
+- the "Inbox" folder item itself, or any other folder item
+- "Archive" or any other folder
+- a folder's overflow/options control (e.g. a "..." or "more options"
+  icon next to a folder name)
+- the top toolbar/ribbon (New, Delete, Archive, Report, Move, Tags,
+  Print, Find, Undo, etc.)
+- the reading pane (the area on the right that shows a previously
+  selected email's content, if any)
+- any other control whose function you are not certain of
+
+If the target email (matching BOTH the subject and sender above) is
+not CLEARLY visible as its own row inside the message-list pane,
+return target_visible=false — do NOT guess a nearby coordinate, and do
+NOT return a coordinate inside any of the excluded areas above under
+any circumstances.
+
+Analyze only what is visually present in this screenshot. Do not
+assume the target is present if you cannot actually see a row matching
+both the subject and sender above. Do not invent a match.
+
+If the target row IS visible, also return its bounding box, in the
+same 0-1000 normalized coordinate space used throughout this project,
+as [y_min, x_min, y_max, x_max] (this is the box_2d convention) —
+covering just that row's clickable area in the message-list pane, not
+the whole message list. The point (x, y) you return must fall inside
+that same box.
+
+Do not suggest what to do next — only report what is visible and
+where. Origin (0,0) is the top-left corner of the image. x increases
+left to right. y increases top to bottom.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "target_visible": <true only if a row matching BOTH target subject and target sender is visible INSIDE THE MESSAGE-LIST PANE, false otherwise>,
+  "matched_subject": "<the subject text exactly as shown in that row, or empty string if not visible>",
+  "matched_sender": "<the sender text exactly as shown in that row, or empty string if not visible>",
+  "box_2d": [<y_min>, <x_min>, <y_max>, <x_max>] or null if not visible,
+  "x": <number, 0-1000 normalized, inside box_2d, or null if not visible>,
+  "y": <number, 0-1000 normalized, inside box_2d, or null if not visible>,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

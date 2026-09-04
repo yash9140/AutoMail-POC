@@ -1,0 +1,64 @@
+You are looking at a Windows 11 desktop screenshot taken immediately
+after the Windows Search UI was opened and the text "Outlook" was
+typed into the search box. You do not decide what to do next — only
+report what you see and where. This is an EVALUATION-ONLY experiment:
+your answer is never used to click anything.
+
+Original screenshot dimensions:
+width = {width}
+height = {height}
+
+Analyze only what is visually present in THIS screenshot. Do not
+assume hidden application state. Do not invent something not visible.
+
+The desktop Outlook application search result is a row in the LEFT-hand
+results list, under the "Best match" heading, showing a visible
+cluster of content:
+
+  [Outlook icon]   Outlook
+                    App
+
+Do NOT use:
+- the "Best match" heading text
+- the right-side Outlook preview/details panel
+- any web/settings/help result mentioning "Outlook"
+- any other row
+
+Do NOT try to infer or guess the boundary of any clickable row or
+container — you are not being asked for a bounding box at all.
+
+YOUR TASK:
+
+Report a single point [y, x] that lies clearly ON VISIBLE CONTENT
+belonging to that cluster — i.e. directly on the icon graphic, or
+directly on one of the text characters of "Outlook" or "App" — never
+on empty background/whitespace space near them, even if that space is
+inside the row. Pick whichever specific visible pixel (icon or text)
+you are MOST confident about.
+
+If you cannot confidently identify this cluster, do not guess — report
+target_visible as false and point as null instead.
+
+Classify target_type as one of: "desktop_app" | "web_result" |
+"settings" | "help" | "other".
+
+COORDINATE CONTRACT — the ONLY accepted format:
+
+point = [y, x], where:
+- both values are integers in the normalized range 0-1000
+- x=0 is the LEFT edge of THIS screenshot, x=1000 is the RIGHT edge
+- y=0 is the TOP edge of THIS screenshot, y=1000 is the BOTTOM edge
+- relative to the EXACT screenshot supplied above, never any other
+  screen/monitor/resolution
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "target_visible": <true only if you can confidently locate a point on visible content in that cluster, false otherwise>,
+  "target_type": "<desktop_app | web_result | settings | help | other>",
+  "visible_label": "<the exact primary label text, or empty string if not visible>",
+  "point": [<y>, <x>] or null if target_visible is false,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

@@ -1,0 +1,22 @@
+You are verifying the result of a controlled text-entry action taken in
+the Microsoft Outlook reply editor.
+
+This is a screenshot taken after text was typed into the reply editor.
+
+Expected text that should now be visible in the reply editor:
+{expected_text}
+
+Analyze only what is visually present in THIS screenshot. Read the text
+actually shown in the reply editor's text-entry area and compare it to
+the expected text above. Do not assume it matches — judge only from what
+you can actually read.
+
+Return ONLY the following structured JSON, with no other text before or
+after it:
+
+{{
+  "verified": <true if the visible text in the reply editor matches the expected text, false otherwise>,
+  "detected_text": "<the text you can actually read in the reply editor, exactly as it appears>",
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

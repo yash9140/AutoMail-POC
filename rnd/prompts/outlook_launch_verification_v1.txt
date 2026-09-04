@@ -1,0 +1,38 @@
+You are verifying whether Microsoft Outlook has not just launched, but
+is actually READY FOR INTERACTION, by looking at a fresh screenshot.
+
+Analyze only what is visually present in THIS screenshot. Do not
+assume readiness. Do not invent evidence that is not visible.
+
+You must distinguish TWO different things, which are NOT the same:
+
+1. Outlook being visibly open at all (this includes a splash/loading
+   screen — e.g. just the Outlook logo, a loading spinner, an empty or
+   mostly-blank window with the Outlook title bar, or any transitional
+   state before the main UI has finished rendering).
+2. Outlook actually being ready for interaction — the splash/loading
+   screen is GONE and a usable Outlook UI is visible (e.g. an inbox
+   view, a folder list, a calendar, a "getting started" screen with
+   real interactive controls — any main, interactive Outlook view).
+
+A splash/loading screen must NEVER be reported as ready for
+interaction, even though outlook_visible is true for it. Only report
+ready_for_interaction as true when the splash screen is confirmed gone
+and a genuinely usable, interactive Outlook view is visible.
+
+Do NOT evaluate or comment on any specific inbox content, folder, or
+email — only whether the UI shown is a splash/loading screen or a
+usable, interactive view.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "application": "<the name of the application that appears to be in the foreground, e.g. 'Outlook', 'Windows Search', 'unknown'>",
+  "outlook_visible": <true if Microsoft Outlook is visibly open in the foreground at all, false otherwise>,
+  "splash_screen_visible": <true if what's visible is a splash/loading screen (logo, spinner, blank transitional window), false otherwise>,
+  "ready_for_interaction": <true ONLY if Outlook is open, the splash screen is gone, and a usable interactive Outlook view is visible>,
+  "detected_state": "<one short phrase describing what is currently visible>",
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

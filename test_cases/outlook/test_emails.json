@@ -1,0 +1,26 @@
+{
+  "note": "Controlled, synthetic test emails for the RND-002 Outlook dataset. No real client/customer content. Prepare these manually in a test/developer mailbox before capturing screenshots.",
+  "emails": [
+    {
+      "test_email_id": "EMAIL-A",
+      "purpose": "Short body, clear single request — used for OUTLOOK-002/003/004/005/010",
+      "sender_display_name": "R&D Test Sender One",
+      "subject": "Project Status Confirmation",
+      "body": "Hi,\n\nPlease confirm whether the testing will be completed by Friday.\n\nThanks."
+    },
+    {
+      "test_email_id": "EMAIL-B",
+      "purpose": "Longer body, multiple paragraphs, a date, and a requested action — used for OUTLOOK-009",
+      "sender_display_name": "R&D Test Sender Two",
+      "subject": "Follow-up: Next Steps for the Q3 Review",
+      "body": "Hi,\n\nThanks for the update earlier this week. I wanted to follow up on a couple of points before we finalize the Q3 review.\n\nFirst, could you confirm whether the revised numbers will be ready by September 3rd? We need them before the review meeting so there's time to circulate them in advance.\n\nSecond, do you have a preference on whether we present the summary as slides or as a written memo this time? Either works on our end, but it would help to know ahead of time.\n\nLet me know if you need anything from us to move this forward.\n\nThanks,\nR&D Test Sender Two"
+    },
+    {
+      "test_email_id": "EMAIL-C",
+      "purpose": "Different sender/subject than EMAIL-A, to avoid a single-example dataset — used for OUTLOOK-008",
+      "sender_display_name": "R&D Test Sender Three",
+      "subject": "Quick Question About the Shared Document",
+      "body": "Hello,\n\nI noticed the shared document hasn't been updated since last week. Is it still being worked on, or should I check with someone else?\n\nNo rush, just checking.\n\nBest,\nR&D Test Sender Three"
+    }
+  ]
+}
