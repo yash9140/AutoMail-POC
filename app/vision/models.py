@@ -2,7 +2,7 @@
 
 Phase 1 scope: declares EmailSection (the structured per-scroll-section
 record the long-email accumulation loop will populate — see
-docs/poc/04_SCROLLING_AND_LONG_EMAIL.md) ahead of Phase 4's actual
+docs/architecture/04_SCROLLING_AND_LONG_EMAIL.md) ahead of Phase 4's actual
 read_email.py implementation, so app/playbook/context.py can reference
 a real type instead of `Any`. Not yet populated by any step this phase.
 
@@ -331,7 +331,7 @@ class EmailHolisticAssessmentResponse(BaseModel):
 
 class EmailSection(BaseModel):
     """One captured+understood section of a (possibly long) email body.
-    Every section is retained in full — see docs/poc/04 — so a
+    Every section is retained in full — see docs/architecture/04 — so a
     date/commitment/name mentioned only in an early section is never
     lost when later sections are accumulated on top of it.
 

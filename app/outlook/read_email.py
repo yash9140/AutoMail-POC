@@ -2,7 +2,7 @@
 
 Phase 4: understand_email() is a bounded scroll-and-accumulate loop
 over the reading pane, structured per section (app.vision.models.
-EmailSection) — see docs/poc/04_SCROLLING_AND_LONG_EMAIL.md for the
+EmailSection) — see docs/architecture/04_SCROLLING_AND_LONG_EMAIL.md for the
 full design. A short email is simply the sections_seen == 1 case of
 this same loop; there is no separate code path for "short" vs "long."
 

@@ -929,7 +929,7 @@ class OutlookLaunchSteps:
         return False
 
     # --- Phase 2: maximize enforcement (sub-step of reaching OUTLOOK_READY,
-    # never a separate playbook state — see docs/poc/02_STATE_MACHINE.md) ---
+    # never a separate playbook state — see docs/architecture/02_STATE_MACHINE.md) ---
 
     def enforce_maximized(self) -> bool:
         """Ensures Outlook is maximized before readiness verification

@@ -11,7 +11,7 @@ Schema validation, coordinate-bounds checking, retries, and result
 persistence are NOT this module's job.
 
 Copied from rnd/providers/base.py for the final POC runtime (app/ no
-longer imports from rnd/ — see docs/poc/01_ARCHITECTURE.md). The rnd/
+longer imports from rnd/ — see docs/architecture/01_ARCHITECTURE.md). The rnd/
 original is left untouched since several rnd/experiments/*.py scripts
 still depend on it.
 """

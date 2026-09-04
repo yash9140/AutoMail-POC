@@ -13,11 +13,11 @@ The research question is not "can Python send an email" — it's:
 > How capable, accurate, fast, reliable, and cost-effective is Vision AI at
 > visually operating Outlook end-to-end?
 
-See [docs/01_POC_Goal_and_Scope.md](docs/01_POC_Goal_and_Scope.md) for the
-full goal statement and [docs/02_RND_Methodology.md](docs/02_RND_Methodology.md)
-for how experiments are run and measured.
+See [docs/r_and_d/01_POC_Goal_and_Scope.md](docs/r_and_d/01_POC_Goal_and_Scope.md)
+for the full goal statement and [docs/r_and_d/02_RND_Methodology.md](docs/r_and_d/02_RND_Methodology.md)
+for how R&D experiments were run and measured.
 
-## Final Target Workflow
+## Final Workflow (implemented and live-runnable)
 
 ```
 Login → Terms & Access → Start Automation
@@ -29,34 +29,31 @@ Login → Terms & Access → Start Automation
   → Show Result
 ```
 
-This POC is built incrementally, one measured experiment at a time — see
-the implementation order in [docs/02_RND_Methodology.md](docs/02_RND_Methodology.md).
-Automatic Send is disabled until earlier steps are proven safe and reliable
-(see `docs/09` onward).
+See [docs/architecture/01_ARCHITECTURE.md](docs/architecture/01_ARCHITECTURE.md)
+and [docs/architecture/02_STATE_MACHINE.md](docs/architecture/02_STATE_MACHINE.md)
+for how this is actually wired together.
 
 ## Project Structure
 
 ```
 outlook-vision-poc/
-├── docs/                  R&D documentation (one file per experiment/topic)
-├── rnd/
-│   ├── capture/           Screen capture implementation
-│   ├── providers/         Vision AI provider interface + implementations
-│   ├── experiments/       Runnable experiment scripts
-│   ├── metrics/           Result evaluation + cost tracking
-│   ├── prompts/           Versioned prompt files sent to the Vision AI
-│   └── models/            Pydantic models for experiment results
-├── screenshots/
-│   ├── raw/               Unmodified captured screenshots
-│   └── annotated/         Screenshots annotated with predicted vs actual targets
-├── results/
-│   ├── raw/                Raw per-test result records (JSON)
-│   ├── reports/             Aggregated reports
-│   └── benchmark.csv       Cross-experiment/cross-model comparison
-├── test_cases/outlook/     Controlled test email definitions
-├── config/                 Model pricing / non-secret configuration
-└── tests/                  Automated tests
+├── app/            Live runtime POC — the only code the app actually runs
+├── tests/          Automated offline tests (no real API calls)
+├── benchmarks/     Real-provider evaluation/latency tools (costs money, never run by pytest)
+├── rnd/            Historical R&D — partially a live runtime dependency, see rnd/README.md
+├── results/        Preserved historical run evidence (raw provider responses, reports)
+├── screenshots/    raw/ is also the live runtime's active screenshot output, see screenshots/README.md
+├── debug/          Runtime-generated diagnostic overlays (opt-in via env var)
+├── test_cases/     Shared fixture data, used by both tests/ and rnd/experiments/
+├── config/         model_pricing.json — read by both app/ and rnd/experiments/
+├── docs/           architecture/ (current design) + r_and_d/ (chronological history) + decisions/ + demo/
+└── scripts/        Utility + historical live-run driver scripts
 ```
+
+Full rationale for this layout, including which folders were
+deliberately **not** moved and why, is in
+[docs/architecture/PROJECT_STRUCTURE.md](docs/architecture/PROJECT_STRUCTURE.md)
+and [docs/decisions/STRUCTURE_REORGANIZATION.md](docs/decisions/STRUCTURE_REORGANIZATION.md).
 
 ## Environment Setup
 
@@ -75,52 +72,75 @@ copy .env.example .env
 ```
 
 Then fill in the API key(s) for whichever Vision AI provider(s) you're
-testing (see `.env.example` for the full list of variables). Never commit
-`.env`.
+using (see `.env.example` for the full list of variables, including
+`AI_PROVIDER=gemini` or `AI_PROVIDER=anthropic`). Never commit `.env`.
 
-## Running Experiments
-
-Experiments are added incrementally; each will be runnable directly, e.g.:
+## Running the App
 
 ```bash
-python rnd/capture/screen_capture.py
-python rnd/experiments/screen_understanding.py
-python rnd/experiments/ui_grounding.py
-python rnd/experiments/outlook_workflow.py
+python -m app.main
 ```
 
-Exact commands and required setup for each experiment are documented in the
-corresponding `docs/0N_*.md` file — see [docs/00_RND_INDEX.md](docs/00_RND_INDEX.md)
-for the current status of every experiment.
+Launches the PySide6 desktop app (Login → Terms & Access → Automation
+Dashboard). Requires a real, visible Outlook desktop window on the same
+machine — it drives the real OS via `pyautogui`, never a Graph/COM/SMTP
+API.
 
-## Where Results Live
+## Running Tests
 
-- Raw, per-test machine-readable results: `results/raw/`
+```bash
+pytest
+```
+
+Runs the full offline test suite (598 tests as of the 2026-09-04
+structure cleanup) — fully mocked, no real network/API calls, no
+pyautogui, no live Outlook interaction. `pytest` from the repository
+root discovers only `tests/*.py`; the real-API benchmark harnesses below
+live outside `tests/` entirely and are never picked up.
+
+## Running Real-Provider Benchmarks
+
+These make **real Claude/Gemini API calls** and cost real money —
+run them deliberately, not as part of normal testing.
+
+```bash
+# Claude grounding-strategy evaluation
+python -m benchmarks.claude.evaluation_runner
+
+# Gemini latency-investigation benchmark
+python -m benchmarks.gemini.benchmark_runner
+```
+
+Output lands in `benchmarks/results/`. See
+[benchmarks/README.md](benchmarks/README.md) for what each harness
+measures.
+
+## Where Historical R&D Results Live
+
+- Raw, per-call provider responses: `results/raw/provider_responses/`
 - Aggregated reports: `results/reports/`
-- Cross-model benchmark comparison: `results/benchmark.csv`
 - Annotated grounding screenshots: `screenshots/annotated/`
+- Chronological write-up per experiment: `docs/r_and_d/`, indexed by
+  [docs/r_and_d/00_RND_INDEX.md](docs/r_and_d/00_RND_INDEX.md)
 
 ## Where Documentation Lives
 
-All R&D documentation is in [docs/](docs/), indexed by
-[docs/00_RND_INDEX.md](docs/00_RND_INDEX.md). Every experiment has a
-document following the same structure: Objective, What Was Built,
-Technology Used, Why, How It Works, How To Use It, Configuration, Test
-Cases, Actual Results, Failures/Observations, Limitations, Conclusion, Next
-Step.
-
-## Running the Final POC
-
-Not yet available. The final integrated PySide6 Windows application
-(Login → Terms & Access → Automation Status → Final Result) is built only
-after the individual Vision AI capabilities have been validated through the
-experiments above — see Step 12 in
-[docs/02_RND_Methodology.md](docs/02_RND_Methodology.md).
+- [docs/architecture/](docs/architecture/) — current POC design: overview,
+  architecture, state machine, safety model, scrolling/long-email
+  handling, configuration, testing/QA, known limitations, project
+  structure.
+- [docs/r_and_d/](docs/r_and_d/) — the historical R&D record, one
+  document per experiment (RND-001 through RND-009D), following the same
+  structure throughout: Objective, What Was Built, Technology Used, Why,
+  How It Works, How To Use It, Configuration, Test Cases, Actual
+  Results, Failures/Observations, Limitations, Conclusion, Next Step.
+- [docs/decisions/](docs/decisions/) — why structural/architectural
+  changes were made.
 
 ## Scope
 
 This is strictly an **Outlook** Vision AI automation POC. It intentionally
 excludes Chrome/browser automation, ERP integration, generic multi-app
 support, production architecture, and any Outlook-specific API/COM/Graph
-integration. See [docs/01_POC_Goal_and_Scope.md](docs/01_POC_Goal_and_Scope.md)
+integration. See [docs/r_and_d/01_POC_Goal_and_Scope.md](docs/r_and_d/01_POC_Goal_and_Scope.md)
 for the full list of exclusions and why.

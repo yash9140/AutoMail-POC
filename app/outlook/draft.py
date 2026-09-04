@@ -395,7 +395,7 @@ class ReplyDraftResult(RND009DResult):
     email_sections retains EVERY accumulated section in full (never
     collapsed into a single running summary) so a date/commitment/name
     mentioned only in an early section is never lost — see
-    app/outlook/read_email.py and docs/poc/04_SCROLLING_AND_LONG_EMAIL.md.
+    app/outlook/read_email.py and docs/architecture/04_SCROLLING_AND_LONG_EMAIL.md.
 
     reply_expectation/requires_user_decision are the authoritative reply-
     necessity classification (app.vision.models.ReplyExpectation),

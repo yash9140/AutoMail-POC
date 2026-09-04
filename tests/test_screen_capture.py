@@ -4,7 +4,7 @@ These mirror SC-001, SC-002, SC-004, SC-005, SC-006 using an isolated
 tmp_path output directory so repeated CI runs don't pile up files under
 screenshots/raw/. The full RND-001 experiment (which writes real, timestamped
 results to results/raw/rnd001_screen_capture_results.json) is run separately
-via rnd/capture/run_rnd001_tests.py — see docs/03_Screen_Capture.md.
+via rnd/capture/run_rnd001_tests.py — see docs/r_and_d/03_Screen_Capture.md.
 """
 
 import sys

@@ -23,6 +23,14 @@ results/reports/*
 !results/raw/.gitkeep
 !results/reports/.gitkeep
 
+# Runtime-generated debug overlays and benchmark output (historical ones
+# already committed stay in git history; only NEW local runs are ignored
+# going forward — same convention as screenshots/raw and results/raw above)
+debug/*
+!debug/.gitkeep
+benchmarks/results/*
+!benchmarks/results/.gitkeep
+
 # Editors
 .vscode/
 .idea/
