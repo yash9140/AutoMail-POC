@@ -15,6 +15,7 @@ from app.outlook.find_email import FindOpenEmailSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.providers.base import RateLimitError  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 
 MODULE = "app.outlook.find_email"
 SCROLL_MODULE = "app.automation.scrolling"
@@ -22,7 +23,7 @@ SCROLL_MODULE = "app.automation.scrolling"
 
 def _steps(target_sender="Yash", target_subject="Mail for project") -> FindOpenEmailSteps:
     return FindOpenEmailSteps(
-        AbortController(), MagicMock(), "gemini-3.6-flash",
+        AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash",
         target_sender=target_sender, target_subject=target_subject,
     )
 
@@ -72,14 +73,14 @@ def _run_find(steps, patches=None):
 
 def test_target_sender_required():
     try:
-        FindOpenEmailSteps(AbortController(), MagicMock(), "gemini-3.6-flash", target_sender="")
+        FindOpenEmailSteps(AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash", target_sender="")
         assert False, "expected ValueError"
     except ValueError:
         pass
 
 
 def test_target_subject_optional_defaults_empty_when_omitted():
-    steps = FindOpenEmailSteps(AbortController(), MagicMock(), "gemini-3.6-flash", target_sender="Yash", target_subject="")
+    steps = FindOpenEmailSteps(AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash", target_sender="Yash", target_subject="")
     assert steps.result.target_subject == ""
     assert steps.result.target_sender == "Yash"
 
@@ -88,7 +89,7 @@ def test_target_subject_optional_defaults_empty_when_omitted():
 
 def test_sender_and_subject_both_required_when_subject_given():
     steps = _ready_steps(target_sender="Yash", target_subject="Mail for project")
-    steps.provider.analyze_screen.return_value = _search_call([
+    steps.vision.primary.analyze_screen.return_value = _search_call([
         _candidate(sender="Yash", subject="Totally different subject"),
     ])
     ok, _ = _run_find(steps)
@@ -98,7 +99,7 @@ def test_sender_and_subject_both_required_when_subject_given():
 
 def test_visible_sender_and_subject_match_found_on_first_look():
     steps = _ready_steps(target_sender="Yash", target_subject="Mail for project")
-    steps.provider.analyze_screen.return_value = _search_call([_candidate()])
+    steps.vision.primary.analyze_screen.return_value = _search_call([_candidate()])
     ok, mock_scroll_pg = _run_find(steps)
     assert ok is True
     mock_scroll_pg.scroll.assert_not_called()
@@ -111,7 +112,7 @@ def test_visible_sender_and_subject_match_found_on_first_look():
 
 def test_sender_only_single_candidate_matches():
     steps = _ready_steps(target_sender="Yash", target_subject="")
-    steps.provider.analyze_screen.return_value = _search_call([
+    steps.vision.primary.analyze_screen.return_value = _search_call([
         _candidate(sender="Yash", subject="Whatever subject this is"),
     ])
     ok, _ = _run_find(steps)
@@ -123,7 +124,7 @@ def test_sender_only_single_candidate_matches():
 
 def test_sender_only_multiple_ambiguous_candidates_safe_stops():
     steps = _ready_steps(target_sender="Yash", target_subject="")
-    steps.provider.analyze_screen.return_value = _search_call([
+    steps.vision.primary.analyze_screen.return_value = _search_call([
         _candidate(sender="Yash", subject="First email", date_or_order="Mon"),
         _candidate(sender="Yash", subject="Second email", date_or_order="Tue"),
     ])
@@ -135,7 +136,7 @@ def test_sender_only_multiple_ambiguous_candidates_safe_stops():
 
 def test_multiple_candidates_resolved_when_dates_are_unambiguous_iso():
     steps = _ready_steps(target_sender="Yash", target_subject="")
-    steps.provider.analyze_screen.return_value = _search_call([
+    steps.vision.primary.analyze_screen.return_value = _search_call([
         _candidate(sender="Yash", subject="Older", date_or_order="2026-08-30"),
         _candidate(sender="Yash", subject="Newer", date_or_order="2026-08-31", row_bbox=(600, 300, 640, 900)),
     ])
@@ -146,7 +147,7 @@ def test_multiple_candidates_resolved_when_dates_are_unambiguous_iso():
 
 def test_multiple_candidates_with_tied_dates_stay_ambiguous():
     steps = _ready_steps(target_sender="Yash", target_subject="")
-    steps.provider.analyze_screen.return_value = _search_call([
+    steps.vision.primary.analyze_screen.return_value = _search_call([
         _candidate(sender="Yash", subject="A", date_or_order="2026-08-31"),
         _candidate(sender="Yash", subject="B", date_or_order="2026-08-31", row_bbox=(600, 300, 640, 900)),
     ])
@@ -159,7 +160,7 @@ def test_multiple_candidates_with_tied_dates_stay_ambiguous():
 
 def test_not_visible_then_found_after_one_scroll():
     steps = _ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _search_call([]),
         _search_call([_candidate()]),
     ]
@@ -173,7 +174,7 @@ def test_not_visible_then_found_after_one_scroll():
 
 def test_not_found_after_max_scroll_attempts():
     steps = _ready_steps()
-    steps.provider.analyze_screen.return_value = _search_call([])
+    steps.vision.primary.analyze_screen.return_value = _search_call([])
     ok, mock_scroll_pg = _run_find(steps)
     assert ok is False
     assert steps.result.failure_reason == LaunchFailureReason.TARGET_EMAIL_NOT_FOUND
@@ -202,7 +203,7 @@ def test_missing_row_bbox_rejected_zero_click():
     steps = _ready_steps()
     candidate = _candidate()
     candidate["row_bbox"] = None
-    steps.provider.analyze_screen.return_value = _search_call([candidate])
+    steps.vision.primary.analyze_screen.return_value = _search_call([candidate])
     ok, _ = _run_find(steps)
     assert ok is False
     assert steps.result.failure_reason == LaunchFailureReason.EMAIL_GROUNDING_INVALID
@@ -211,7 +212,7 @@ def test_missing_row_bbox_rejected_zero_click():
 
 def test_degenerate_zero_area_bbox_rejected():
     steps = _ready_steps()
-    steps.provider.analyze_screen.return_value = _search_call([
+    steps.vision.primary.analyze_screen.return_value = _search_call([
         _candidate(row_bbox=(500, 500, 500, 500)),
     ])
     ok, _ = _run_find(steps)
@@ -223,7 +224,7 @@ def test_sidebar_bbox_rejected_regardless_of_confidence():
     steps = _ready_steps()
     # x range [10, 100] -> center x=55 normalized -> pixel = 55/1000*1920 ≈ 106px,
     # well inside the 17% sidebar exclusion zone (~326px), confidence=1.0.
-    steps.provider.analyze_screen.return_value = _search_call([
+    steps.vision.primary.analyze_screen.return_value = _search_call([
         _candidate(row_bbox=(480, 10, 520, 100), confidence=1.0),
     ])
     ok, _ = _run_find(steps)
@@ -235,7 +236,7 @@ def test_sidebar_bbox_rejected_regardless_of_confidence():
 
 def test_bbox_out_of_normalized_range_rejected():
     steps = _ready_steps()
-    steps.provider.analyze_screen.return_value = _search_call([
+    steps.vision.primary.analyze_screen.return_value = _search_call([
         _candidate(row_bbox=(480, 300, 520, 1500)),  # x_max=1500 > 1000
     ])
     ok, _ = _run_find(steps)
@@ -247,7 +248,7 @@ def test_bbox_out_of_normalized_range_rejected():
 
 def test_low_confidence_candidate_rejected():
     steps = _ready_steps()
-    steps.provider.analyze_screen.return_value = _search_call([_candidate(confidence=0.1)])
+    steps.vision.primary.analyze_screen.return_value = _search_call([_candidate(confidence=0.1)])
     ok, _ = _run_find(steps)
     assert ok is False
     assert steps.result.failure_reason == LaunchFailureReason.EMAIL_GROUNDING_INVALID
@@ -257,7 +258,7 @@ def test_low_confidence_candidate_rejected():
 
 def test_provider_transient_error_retried_once_then_succeeds():
     steps = _ready_steps()
-    steps.provider.analyze_screen.side_effect = [RateLimitError("HTTP 429"), _search_call([_candidate()])]
+    steps.vision.primary.analyze_screen.side_effect = [RateLimitError("HTTP 429"), _search_call([_candidate()])]
     ok, mock_scroll_pg = _run_find(steps)
     assert ok is True
     assert steps.result.provider_retries == 1
@@ -266,7 +267,7 @@ def test_provider_transient_error_retried_once_then_succeeds():
 
 def test_provider_error_exhausted_does_not_scroll_or_click():
     steps = _ready_steps()
-    steps.provider.analyze_screen.side_effect = RateLimitError("HTTP 429")
+    steps.vision.primary.analyze_screen.side_effect = RateLimitError("HTTP 429")
     ok, mock_scroll_pg = _run_find(steps)
     assert ok is False
     assert steps.result.failure_reason == LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
@@ -329,7 +330,7 @@ def test_open_verification_retries_without_reclick_and_click_count_stays_one():
                      "reason": "open"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.side_effect = [not_yet, confirmed]
+    steps.vision.primary.analyze_screen.side_effect = [not_yet, confirmed]
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_email_opened() is True
     assert len(steps.result.email_open_verification_attempts) == 2
@@ -348,7 +349,7 @@ def test_wrong_email_opened_classified_distinctly():
                      "reason": "wrong email"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = wrong_email
+    steps.vision.primary.analyze_screen.return_value = wrong_email
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_email_opened() is False
     assert steps.result.failure_reason == LaunchFailureReason.WRONG_EMAIL_OPENED
@@ -364,7 +365,7 @@ def test_subject_not_required_when_target_subject_empty():
                      "reason": "ok"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_email_opened() is True
 

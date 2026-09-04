@@ -21,13 +21,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.outlook.find_email import FindOpenEmailSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 
 MODULE = "app.outlook.find_email"
 
 
 def _steps(target_sender: str = "Yash", target_subject: str = "Mail for project") -> FindOpenEmailSteps:
     steps = FindOpenEmailSteps(
-        AbortController(), MagicMock(), "gemini-3.6-flash",
+        AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash",
         target_sender=target_sender, target_subject=target_subject,
     )
     steps.result.ready_for_interaction = True
@@ -82,7 +83,7 @@ def _run(steps: FindOpenEmailSteps, call):
          patch(f"{MODULE}.time.sleep"), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
         mock_pyautogui.FAILSAFE = True
-        steps.provider.analyze_screen.return_value = call
+        steps.vision.primary.analyze_screen.return_value = call
         result = steps.find_target_email()
     return result, mock_pyautogui, mock_scroll
 
@@ -224,7 +225,7 @@ def test_post_click_verification_still_catches_mismatch_after_a_valid_match():
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Inbox - Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.time.sleep"):
-        steps.provider.analyze_screen.return_value = verify_call
+        steps.vision.primary.analyze_screen.return_value = verify_call
         assert steps.verify_email_opened() is False
     assert steps.result.failure_reason == LaunchFailureReason.WRONG_EMAIL_OPENED
 
@@ -253,7 +254,7 @@ def _run_find_click_verify(steps: FindOpenEmailSteps, search_call, verify_call):
          patch(f"{MODULE}.time.sleep"), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
         mock_pyautogui.FAILSAFE = True
-        steps.provider.analyze_screen.side_effect = [search_call, verify_call, verify_call]
+        steps.vision.primary.analyze_screen.side_effect = [search_call, verify_call, verify_call]
         found = steps.find_target_email()
         if not found:
             return found, False, False, mock_pyautogui

@@ -23,6 +23,7 @@ from app.outlook.launch import OutlookLaunchSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.safety.validators import GroundingCheckFailure, validate_grounding  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 
 MODULE = "app.outlook.launch"
 
@@ -30,7 +31,7 @@ _ENV_INFO_MATCH = {"pyautogui_width": 1920, "pyautogui_height": 1080, "dimension
 
 
 def _steps() -> OutlookLaunchSteps:
-    steps = OutlookLaunchSteps(AbortController(), MagicMock(), "claude-sonnet-5")
+    steps = OutlookLaunchSteps(AbortController(), VisionService(MagicMock(), fallback=None), "claude-sonnet-5")
     steps.result.screen_width, steps.result.screen_height = 1920, 1080
     return steps
 
@@ -57,7 +58,7 @@ def test_A_known_screenshot_bbox_converts_to_expected_pixel_rect_and_click_point
     # off-center, asymmetric box (not the image midpoint) so this proves
     # the general formula, not a coincidence at (500, 500).
     bbox = [100.0, 700.0, 180.0, 900.0]
-    steps.provider.analyze_screen.return_value = _call(bbox)
+    steps.vision.primary.analyze_screen.return_value = _call(bbox)
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert steps.ground_search_result(_capture(1920, 1080)) is True
@@ -80,7 +81,7 @@ def test_B_x_y_not_swapped_in_conversion():
     asserts the CORRECT point and explicitly rules out the swapped one."""
     steps = _steps()
     bbox = [400.0, 30.0, 440.0, 970.0]
-    steps.provider.analyze_screen.return_value = _call(bbox)
+    steps.vision.primary.analyze_screen.return_value = _call(bbox)
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert steps.ground_search_result(_capture(1920, 1080)) is True
@@ -104,7 +105,7 @@ def test_C_native_pixel_looking_bbox_rejected_not_silently_scaled():
     # coordinates for a 1920-wide screenshot, never as 0-1000 normalized
     # values — must be rejected outright, never clamped or reinterpreted.
     bbox = [900.0, 1400.0, 960.0, 1800.0]
-    steps.provider.analyze_screen.return_value = _call(bbox)
+    steps.vision.primary.analyze_screen.return_value = _call(bbox)
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert steps.ground_search_result(_capture(1920, 1080)) is False
@@ -121,13 +122,13 @@ def test_D_valid_bbox_produces_correct_click_point_dynamically_at_different_posi
     result positions and checking both convert correctly and disagree
     with each other."""
     top_left = _steps()
-    top_left.provider.analyze_screen.return_value = _call([50.0, 60.0, 90.0, 200.0])
+    top_left.vision.primary.analyze_screen.return_value = _call([50.0, 60.0, 90.0, 200.0])
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert top_left.ground_search_result(_capture(1920, 1080)) is True
     assert (top_left.result.converted_x, top_left.result.converted_y) == (250, 76)
 
     bottom_right = _steps()
-    bottom_right.provider.analyze_screen.return_value = _call([850.0, 800.0, 900.0, 950.0])
+    bottom_right.vision.primary.analyze_screen.return_value = _call([850.0, 800.0, 900.0, 950.0])
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert bottom_right.ground_search_result(_capture(1920, 1080)) is True
     assert (bottom_right.result.converted_x, bottom_right.result.converted_y) == (1680, 945)
@@ -157,7 +158,7 @@ def test_E_screenshot_pyautogui_dimension_mismatch_detected_before_click():
     assert steps.result.dimensions_match is False
     assert steps.result.pyautogui_width == 1536
     assert steps.result.pyautogui_height == 864
-    steps.provider.analyze_screen.assert_not_called()
+    steps.vision.primary.analyze_screen.assert_not_called()
 
 
 # --- F: a point outside its own bbox is rejected by the shared validator ---
@@ -187,7 +188,7 @@ def test_F_point_outside_bbox_rejected_by_shared_validator():
 def test_G_debug_artifact_disabled_by_default_and_never_alters_click():
     steps = _steps()
     bbox = [100.0, 700.0, 180.0, 900.0]
-    steps.provider.analyze_screen.return_value = _call(bbox)
+    steps.vision.primary.analyze_screen.return_value = _call(bbox)
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH), \
          patch(f"{MODULE}.save_grounding_debug_artifact") as mock_save:
@@ -205,7 +206,7 @@ def test_G_debug_artifact_enabled_does_not_change_computed_click_point():
     diagnostics are observational only."""
     steps = _steps()
     bbox = [100.0, 700.0, 180.0, 900.0]
-    steps.provider.analyze_screen.return_value = _call(bbox)
+    steps.vision.primary.analyze_screen.return_value = _call(bbox)
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH), \
          patch(f"{MODULE}._DEBUG_ARTIFACTS_ENABLED", True), \

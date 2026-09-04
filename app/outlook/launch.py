@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import Optional
 
 import pyautogui
-from pydantic import ValidationError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -49,9 +48,7 @@ from app.config.settings import (  # noqa: E402
     TYPE_INTERVAL_SECONDS,
     VISION_CONFIDENCE_THRESHOLD,
     WINDOWS_KEY_STABILIZE_SECONDS,
-    get_provider,
 )
-from app.fallback.recovery import call_with_provider_retry  # noqa: E402
 from app.metrics.step_metrics import estimate_cost  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
@@ -65,35 +62,30 @@ from app.safety.foreground import (  # noqa: E402
 )
 from app.safety.validators import GroundingCheckFailure, validate_grounding  # noqa: E402
 from app.vision.debug_overlay import save_grounding_debug_artifact  # noqa: E402
-from app.vision.grounding import coordinate_in_image_bounds, normalize_1000_to_pixels  # noqa: E402
+from app.vision.grounding import normalize_1000_to_pixels  # noqa: E402
 from app.vision.models import OutlookSearchGroundingResponse, OutlookSearchRefineResponse  # noqa: E402
-from app.vision.providers.base import VisionProvider  # noqa: E402
+from app.vision.service import VisionRequest, VisionService, get_vision_service  # noqa: E402
 from rnd.models.outlook_launch import (  # noqa: E402
     CallMetrics,
     OutlookLaunchVerificationResponse,
     OutlookReadinessAttempt,
     RND009BResult,
-    WindowsSearchGroundingResponse,
 )
 
 PROMPTS_DIR = PROJECT_ROOT / "rnd" / "prompts"
-# Claude (Anthropic) OUTLOOK_SEARCH path — bbox + semantic-classification
-# + tightness-self-check + bounded refine-pass (2026-09 R&D). See
-# _ground_search_result_claude().
+# OUTLOOK_SEARCH — bbox + semantic-classification + tightness-self-check
+# + bounded refine-pass, used for BOTH providers (primary or fallback)
+# since the 2026-09-05 provider-architecture unification — see
+# ground_search_result()'s docstring for why this used to be two
+# separate prompts/schemas and no longer is. The historical Gemini-only
+# loose-point prompt (rnd/prompts/windows_search_grounding_v1.txt) is
+# left in place, frozen, simply no longer referenced here.
 WINDOWS_SEARCH_GROUNDING_PROMPT_PATH = (
     PROJECT_ROOT / "app" / "vision" / "prompts" / "outlook_search_grounding_v1.txt"
 )
 OUTLOOK_SEARCH_REFINE_PROMPT_PATH = (
     PROJECT_ROOT / "app" / "vision" / "prompts" / "outlook_search_grounding_refine_v1.txt"
 )
-# Gemini OUTLOOK_SEARCH path — the ORIGINAL, pre-Claude-migration, single
-# loose-point contract (rnd/prompts/windows_search_grounding_v1.txt,
-# historical and frozen — read directly, not copied, so this is always
-# byte-identical to what the original RND-009B flow used). Gemini never
-# showed the "Best match" header-vs-row bbox-scoping problem Claude did
-# during live testing, so it is intentionally kept simple rather than
-# forced through Claude's bbox pipeline. See _ground_search_result_gemini().
-WINDOWS_SEARCH_GROUNDING_PROMPT_PATH_GEMINI = PROMPTS_DIR / "windows_search_grounding_v1.txt"
 OUTLOOK_LAUNCH_VERIFICATION_PROMPT_PATH = PROMPTS_DIR / "outlook_launch_verification_v1.txt"
 
 # Kept as a module-level alias (same value as VISION_CONFIDENCE_THRESHOLD)
@@ -149,15 +141,19 @@ _GROUNDING_FAILURE_TO_REASON = {
 }
 
 
-def _provider() -> tuple[VisionProvider, str]:
-    """Kept as a thin alias to app.config.settings.get_provider() — the
-    name several existing call sites/tests import. Returns whichever
-    provider get_provider() constructs — Anthropic (Claude) or Gemini,
-    whichever AI_PROVIDER selects (see app/config/settings.py). This
-    module's OWN provider-specific behavior is isolated to the ONE
-    dispatch in ground_search_result() — see
-    _ground_search_result_claude()/_ground_search_result_gemini()."""
-    return get_provider()
+def _provider() -> tuple[VisionService, str]:
+    """Kept as a thin alias to app.vision.service.get_vision_service()
+    (2026-09-05, Claude-primary/Gemini-fallback architecture) — the name
+    several existing call sites/tests import. Returns the VisionService
+    composed from whichever provider(s) PRIMARY_VISION_PROVIDER/
+    FALLBACK_VISION_PROVIDER (or the legacy AI_PROVIDER, for backward
+    compatibility) select. Every OUTLOOK_SEARCH/OUTLOOK_SEARCH_REFINE/
+    OUTLOOK_READINESS call in this module goes through this ONE
+    VisionService — there is no provider-name branch anywhere in this
+    module anymore; ground_search_result() uses the exact same bbox
+    grounding contract regardless of which provider (primary or
+    fallback) actually answers."""
+    return get_vision_service()
 
 
 class OutlookLaunchResult(RND009BResult):
@@ -192,6 +188,11 @@ class OutlookLaunchResult(RND009BResult):
     outlook_ready_ms: Optional[float] = None
 
     provider_retries: int = 0
+    # Count of Vision calls in this run resolved by the FALLBACK provider
+    # rather than the primary (2026-09-05 Claude-primary/Gemini-fallback
+    # architecture) — 0 whenever no fallback is configured or the primary
+    # never technically failed.
+    fallback_uses: int = 0
 
     # --- Live coordinate-contract fix (2026-09-02) ---
     search_grounding: Optional[OutlookSearchGroundingResponse] = None
@@ -208,9 +209,9 @@ class OutlookLaunchResult(RND009BResult):
 
 
 class OutlookLaunchSteps:
-    def __init__(self, abort_controller: AbortController, provider: VisionProvider, model: str) -> None:
+    def __init__(self, abort_controller: AbortController, vision: VisionService, model: str) -> None:
         self.abort_controller = abort_controller
-        self.provider = provider
+        self.vision = vision
         self.model = model
         self.result = OutlookLaunchResult()
         self._launch_start_monotonic: Optional[float] = None
@@ -281,16 +282,30 @@ class OutlookLaunchSteps:
         return capture
 
     def ground_search_result(self, capture) -> bool:
-        """Shared pre-flight (abort + coordinate-space checks — generic,
-        provider-independent safety, see below), then dispatches to the
-        one provider-specific OUTLOOK_SEARCH grounding strategy for
-        whichever provider is actually configured. This dispatch is
-        deliberately the ONLY provider-name check in this module (in the
-        whole find/read/reply/draft/send pipeline, in fact) — every
-        other stage sends the same prompt/schema to whichever provider
-        get_provider() constructed, unaware of which one it is. See
-        _ground_search_result_claude()/_ground_search_result_gemini()
-        for why OUTLOOK_SEARCH specifically needs two strategies."""
+        """Shared pre-flight (abort + coordinate-space checks), then the
+        ONE OUTLOOK_SEARCH grounding strategy — bbox + semantic
+        classification + tightness self-check + bounded same-screenshot
+        refine pass — used regardless of which provider (primary or
+        fallback) actually answers the self.vision.analyze() call below.
+
+        History (2026-09-05 provider-architecture unification): this
+        used to dispatch on self.provider.provider_name to one of two
+        entirely different OUTLOOK_SEARCH implementations — a Claude-only
+        bbox-based one (this method's current body) and a Gemini-only
+        loose-point one, because Gemini's original single-point contract
+        "just worked" and was never revisited. That was the ONE
+        provider-name branch anywhere in the find/read/reply/draft/send
+        pipeline, and it directly violated the "one Outlook workflow"
+        rule once Gemini became a fallback rather than an independently-
+        selected primary. Every OTHER bbox-grounded stage in this
+        codebase (EmailSearchResponse, ReplySearchResponse,
+        SendSearchResponse) already shares one schema across both
+        providers successfully — so this stage now does too. The
+        Gemini-only loose-point contract itself is NOT deleted: it
+        remains exactly as it was, frozen, at rnd/prompts/
+        windows_search_grounding_v1.txt and rnd/models/outlook_launch.py
+        ::WindowsSearchGroundingResponse — simply no longer referenced
+        by the live dispatch."""
         if self.check_abort("before_vision_call"):
             return False
 
@@ -322,53 +337,36 @@ class OutlookLaunchSteps:
             )
             return False
 
-        if self.provider.provider_name == "gemini":
-            return self._ground_search_result_gemini(capture)
-        return self._ground_search_result_claude(capture)
-
-    def _ground_search_result_claude(self, capture) -> bool:
-        """Claude (Anthropic) OUTLOOK_SEARCH grounding — bbox + semantic
-        classification + tightness-self-check + bounded same-screenshot
-        refine-pass, developed during the 2026-09 Claude R&D after live
-        testing showed Claude sometimes grounding the "Best match"
-        section header instead of the actual Outlook result row.
-        Preserved unchanged here; see git-independent history in this
-        file's own accumulated docstrings/comments for the full
-        reasoning behind each check."""
         prompt_text = WINDOWS_SEARCH_GROUNDING_PROMPT_PATH.read_text(encoding="utf-8").format(
             width=capture.width, height=capture.height
         )
-        outcome = call_with_provider_retry(
-            lambda: self.provider.analyze_screen(Path(capture.path), "Locate the Outlook search result", prompt_text),
-            stage=STAGE_OUTLOOK_SEARCH, provider_name=self.provider.provider_name,
-        )
-        self.result.provider_retries += outcome.retries_used
-        if outcome.result is None:
+        outcome = self.vision.analyze(VisionRequest(
+            stage=STAGE_OUTLOOK_SEARCH, screenshot_path=Path(capture.path),
+            goal="Locate the Outlook search result", prompt_text=prompt_text,
+            response_model=OutlookSearchGroundingResponse,
+        ))
+        self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+        self.result.fallback_uses += 1 if outcome.fallback_used else 0
+        if outcome.parsed is None:
             self.result.result = "ERROR"
             self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
             self.result.notes = outcome.error
             return False
-        call = outcome.result
+        structured = outcome.parsed
+        call_metrics = outcome.call_metrics
 
         metrics = CallMetrics(
-            latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-            estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+            latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+            output_tokens=call_metrics.output_tokens,
+            estimated_cost=estimate_cost(
+                call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+            ),
         )
         self._accumulate(metrics)
         self.result.grounding_metrics = metrics
-        self.result.vision_grounding_latency_ms = call.latency_ms
+        self.result.vision_grounding_latency_ms = call_metrics.latency_ms
 
         if self.check_abort("after_vision_response"):
-            return False
-
-        try:
-            structured = OutlookSearchGroundingResponse.model_validate(call.parsed_json) if call.parsed_json else None
-        except ValidationError:
-            structured = None
-        if structured is None:
-            self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-            self.result.notes = "Grounding response was not schema-valid."
             return False
 
         self.result.search_grounding = structured
@@ -451,29 +449,24 @@ class OutlookLaunchSteps:
                 visible_label=structured.visible_label, visible_sublabel=structured.visible_sublabel,
                 width=capture.width, height=capture.height,
             )
-            refine_outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(
-                    Path(capture.path), "Tighten the bbox for the previously identified Outlook result", refine_prompt,
-                ),
-                stage=STAGE_OUTLOOK_SEARCH_REFINE, provider_name=self.provider.provider_name,
-            )
-            self.result.provider_retries += refine_outcome.retries_used
+            refine_outcome = self.vision.analyze(VisionRequest(
+                stage=STAGE_OUTLOOK_SEARCH_REFINE, screenshot_path=Path(capture.path),
+                goal="Tighten the bbox for the previously identified Outlook result", prompt_text=refine_prompt,
+                response_model=OutlookSearchRefineResponse,
+            ))
+            self.result.provider_retries += refine_outcome.primary_retries + refine_outcome.fallback_retries
+            self.result.fallback_uses += 1 if refine_outcome.fallback_used else 0
             self.result.refine_pass_used = True
 
-            refined = None
-            if refine_outcome.result is not None:
-                refine_call = refine_outcome.result
-                try:
-                    refined = OutlookSearchRefineResponse.model_validate(refine_call.parsed_json) \
-                        if refine_call.parsed_json else None
-                except ValidationError:
-                    refined = None
+            refined = refine_outcome.parsed
+            if refined is not None:
+                refine_call_metrics = refine_outcome.call_metrics
                 refine_metrics = CallMetrics(
-                    latency_ms=refine_call.latency_ms, input_tokens=refine_call.input_tokens,
-                    output_tokens=refine_call.output_tokens,
+                    latency_ms=refine_call_metrics.latency_ms, input_tokens=refine_call_metrics.input_tokens,
+                    output_tokens=refine_call_metrics.output_tokens,
                     estimated_cost=estimate_cost(
-                        self.provider.provider_name, refine_call.model,
-                        refine_call.input_tokens, refine_call.output_tokens,
+                        refine_call_metrics.provider_name, refine_call_metrics.model,
+                        refine_call_metrics.input_tokens, refine_call_metrics.output_tokens,
                     ),
                 )
                 self._accumulate(refine_metrics)
@@ -595,111 +588,6 @@ class OutlookLaunchSteps:
             )
             if validation.notes:
                 self.result.notes = validation.notes
-            return False
-
-        return True  # ready for human approval
-
-    def _ground_search_result_gemini(self, capture) -> bool:
-        """Gemini OUTLOOK_SEARCH grounding — the ORIGINAL, pre-Claude-
-        migration, single-loose-point flow (2026-09-04, demo-prep
-        restoration): a plain (x, y) point per rnd/prompts/
-        windows_search_grounding_v1.txt's historical, frozen contract
-        (search_visible / outlook_result_visible / result_label / x / y
-        / confidence). Reconstructed from that surviving prompt file and
-        rnd/models/outlook_launch.py::WindowsSearchGroundingResponse —
-        no git history was needed or used. Gemini never showed the
-        "Best match" header-vs-row bbox-scoping problem Claude did
-        during live testing, so it is intentionally NOT forced through
-        Claude's bbox + semantic-classification + refine-pass pipeline
-        (_ground_search_result_claude) — same failure-reason vocabulary
-        (WINDOWS_SEARCH_NOT_VISIBLE / OUTLOOK_RESULT_NOT_FOUND /
-        GROUNDING_INVALID / GROUNDING_OUT_OF_BOUNDS), same
-        provider-retry/abort/logging/debug-overlay conventions as every
-        other stage — only the response shape and validation are
-        simpler, because that simplicity is what actually worked."""
-        prompt_text = WINDOWS_SEARCH_GROUNDING_PROMPT_PATH_GEMINI.read_text(encoding="utf-8").format(
-            width=capture.width, height=capture.height
-        )
-        outcome = call_with_provider_retry(
-            lambda: self.provider.analyze_screen(Path(capture.path), "Locate the Outlook search result", prompt_text),
-            stage=STAGE_OUTLOOK_SEARCH, provider_name=self.provider.provider_name,
-        )
-        self.result.provider_retries += outcome.retries_used
-        if outcome.result is None:
-            self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-            self.result.notes = outcome.error
-            return False
-        call = outcome.result
-
-        metrics = CallMetrics(
-            latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-            estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
-        )
-        self._accumulate(metrics)
-        self.result.grounding_metrics = metrics
-        self.result.vision_grounding_latency_ms = call.latency_ms
-
-        if self.check_abort("after_vision_response"):
-            return False
-
-        try:
-            structured = WindowsSearchGroundingResponse.model_validate(call.parsed_json) if call.parsed_json else None
-        except ValidationError:
-            structured = None
-        if structured is None:
-            self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-            self.result.notes = "Grounding response was not schema-valid."
-            return False
-
-        self.result.grounding = structured
-
-        if not structured.search_visible:
-            self.result.result = "FAIL"
-            self.result.failure_reason = LaunchFailureReason.WINDOWS_SEARCH_NOT_VISIBLE
-            return False
-        if not structured.outlook_result_visible or "outlook" not in structured.result_label.lower():
-            self.result.result = "FAIL"
-            self.result.failure_reason = LaunchFailureReason.OUTLOOK_RESULT_NOT_FOUND
-            return False
-        if structured.x is None or structured.y is None:
-            self.result.result = "FAIL"
-            self.result.failure_reason = LaunchFailureReason.GROUNDING_INVALID
-            return False
-
-        self.result.raw_x, self.result.raw_y = structured.x, structured.y
-        cx, cy = normalize_1000_to_pixels(structured.x, structured.y, capture.width, capture.height)
-        cx, cy = round(cx), round(cy)
-        self.result.converted_x, self.result.converted_y = cx, cy
-
-        in_bounds = coordinate_in_image_bounds(cx, cy, capture.width, capture.height)
-        self.result.coordinate_in_screen_bounds = in_bounds
-
-        _grounding_logger.info(
-            "OUTLOOK_GROUNDING(gemini) search_visible=%s outlook_result_visible=%s result_label=%r "
-            "raw_point=(%s, %s) screenshot_size=%sx%s click_point=(%s, %s) confidence=%s in_bounds=%s",
-            structured.search_visible, structured.outlook_result_visible, structured.result_label,
-            structured.x, structured.y, capture.width, capture.height, cx, cy, structured.confidence, in_bounds,
-        )
-
-        if _DEBUG_ARTIFACTS_ENABLED:
-            artifact_path = save_grounding_debug_artifact(
-                Path(capture.path), None, (cx, cy), label="outlook_search_grounding_gemini",
-                overlay_text=f"result_label={structured.result_label!r} confidence={structured.confidence}",
-            )
-            if artifact_path is not None:
-                self.result.grounding_debug_artifact = str(artifact_path)
-
-        if not in_bounds:
-            self.result.result = "FAIL"
-            self.result.failure_reason = LaunchFailureReason.GROUNDING_OUT_OF_BOUNDS
-            return False
-
-        if structured.confidence < GROUNDING_CONFIDENCE_THRESHOLD:
-            self.result.result = "FAIL"
-            self.result.failure_reason = LaunchFailureReason.GROUNDING_INVALID
-            self.result.notes = f"Confidence {structured.confidence} below threshold {GROUNDING_CONFIDENCE_THRESHOLD}."
             return False
 
         return True  # ready for human approval
@@ -865,41 +753,34 @@ class OutlookLaunchSteps:
             attempt.screenshot = capture.filename
 
             prompt_text = OUTLOOK_LAUNCH_VERIFICATION_PROMPT_PATH.read_text(encoding="utf-8")
-            outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(Path(capture.path), "Verify Outlook is ready for interaction", prompt_text),
-                stage=STAGE_OUTLOOK_READINESS, provider_name=self.provider.provider_name,
-            )
-            self.result.provider_retries += outcome.retries_used
-            if outcome.result is None:
+            outcome = self.vision.analyze(VisionRequest(
+                stage=STAGE_OUTLOOK_READINESS, screenshot_path=Path(capture.path),
+                goal="Verify Outlook is ready for interaction", prompt_text=prompt_text,
+                response_model=OutlookLaunchVerificationResponse,
+            ))
+            self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+            self.result.fallback_uses += 1 if outcome.fallback_used else 0
+            if outcome.parsed is None:
                 attempt.error = outcome.error
                 self.result.readiness_attempts.append(attempt)
                 self.result.result = "ERROR"
                 self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
                 self.result.notes = outcome.error
                 return False
-            call = outcome.result
+            structured = outcome.parsed
+            call_metrics = outcome.call_metrics
 
             metrics = CallMetrics(
-                latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-                estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+                latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+                output_tokens=call_metrics.output_tokens,
+                estimated_cost=estimate_cost(
+                    call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+                ),
             )
             self._accumulate(metrics)
             attempt.metrics = metrics
             if attempt_number == 1:
                 self.result.launch_verification_metrics = metrics
-
-            try:
-                structured = OutlookLaunchVerificationResponse.model_validate(call.parsed_json) if call.parsed_json else None
-            except ValidationError:
-                structured = None
-
-            if structured is None:
-                attempt.error = "Response was not schema-valid."
-                self.result.readiness_attempts.append(attempt)
-                self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-                self.result.notes = "Readiness-verification response was not schema-valid."
-                return False
 
             attempt.schema_valid = True
             attempt.outlook_visible = structured.outlook_visible

@@ -58,10 +58,14 @@ def _result(parsed_json: dict, model: str = "gemini-3.6-flash") -> ProviderCallR
 
 
 def _search_grounding():
-    # Gemini's OWN restored contract — a loose point, not a bbox (see
-    # rnd/prompts/windows_search_grounding_v1.txt / WindowsSearchGroundingResponse).
-    return _result({"search_visible": True, "outlook_result_visible": True, "result_label": "Outlook",
-                     "x": 500.0, "y": 300.0, "confidence": 0.95, "reason": "ok"})
+    # Since the 2026-09-05 provider-architecture unification, OUTLOOK_SEARCH
+    # uses the SAME bbox contract (OutlookSearchGroundingResponse) for both
+    # providers — this used to be Gemini's own loose-point contract (rnd/
+    # prompts/windows_search_grounding_v1.txt / WindowsSearchGroundingResponse),
+    # which is now only reachable via that frozen historical R&D path, never
+    # live. Mirrors test_provider_migration.py's identical fixture.
+    return _result({"search_visible": True, "target_visible": True, "target_type": "desktop_app", "visible_label": "Outlook",
+                     "bbox": [250.0, 400.0, 350.0, 600.0], "confidence": 0.95, "reason": "ok"})
 
 
 def _readiness_ready():
@@ -267,34 +271,42 @@ def test_E_transient_gemini_error_retries_gemini_only_no_fallback_no_physical_re
     assert mocks["launch"].click.call_count == 1  # never repeated the physical click
 
 
-# --- F/G: Gemini OUTLOOK_SEARCH uses the reconstructed point-based path;
-# Claude-specific refine logic is never invoked ---
+# --- F/G: Gemini OUTLOOK_SEARCH now uses the SAME bbox contract Claude
+# does (2026-09-05 provider-architecture unification) — there is no
+# separate Gemini-only point-based live path anymore; that contract
+# survives only as frozen historical evidence (rnd/prompts/
+# windows_search_grounding_v1.txt, rnd/models/outlook_launch.py::
+# WindowsSearchGroundingResponse), never reachable from the live
+# dispatch regardless of which provider is configured. ---
 
-def test_FG_gemini_outlook_search_uses_point_based_path_not_claude_refine():
+def test_FG_gemini_outlook_search_uses_the_same_unified_bbox_contract_as_claude():
     from app.outlook.launch import OutlookLaunchSteps
     from app.safety.abort_controller import AbortController as AC
+    from app.vision.service import VisionService as VS
 
-    steps = OutlookLaunchSteps(AC(), MagicMock(provider_name="gemini"), "gemini-3.6-flash")
+    mock_provider = MagicMock(provider_name="gemini")
+    steps = OutlookLaunchSteps(AC(), VS(mock_provider, fallback=None), "gemini-3.6-flash")
     steps.result.screen_width, steps.result.screen_height = 1920, 1080
     capture = MagicMock(filename="s.png", path="s.png", width=1920, height=1080)
-    steps.provider.analyze_screen.return_value = _search_grounding()
+    mock_provider.analyze_screen.return_value = _search_grounding()
 
     with patch(f"{LAUNCH_MODULE}.get_environment_info",
                return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True}):
         assert steps.ground_search_result(capture) is True
 
-    # F: the point-based Gemini contract was used — self.result.grounding
-    # (the ORIGINAL RND009BResult field) is populated with an x/y point.
-    assert steps.result.grounding is not None
-    assert steps.result.grounding.x == 500.0
-    assert steps.result.grounding.y == 300.0
-    assert steps.result.converted_x == round(500.0 / 1000 * 1920)
-    assert steps.result.converted_y == round(300.0 / 1000 * 1080)
+    # F: the unified bbox contract was used regardless of provider —
+    # self.result.search_grounding is populated, with a bbox-CENTER click
+    # point (never a loose x/y).
+    assert steps.result.search_grounding is not None
+    assert steps.result.search_grounding.bbox == [250.0, 400.0, 350.0, 600.0]
+    center_x_norm, center_y_norm = (400.0 + 600.0) / 2, (250.0 + 350.0) / 2
+    assert steps.result.converted_x == round(center_x_norm / 1000 * 1920)
+    assert steps.result.converted_y == round(center_y_norm / 1000 * 1080)
 
-    # G: the Claude-only bbox/refine fields were never touched.
-    assert steps.result.search_grounding is None
-    assert steps.result.search_grounding_refine is None
-    assert steps.result.refine_pass_used is False
-    # Only ONE Vision call total — the Claude path's bounded second-pass
-    # refine call was never reachable/invoked in Gemini mode.
-    assert steps.provider.analyze_screen.call_count == 1
+    # G: the historical Gemini-only point-based field (inherited from
+    # RND009BResult) is never populated by the live dispatch anymore,
+    # for either provider.
+    assert steps.result.grounding is None
+    # bbox_tightly_scoped defaulted True in the fixture above, so the
+    # bounded refine pass never fires — only ONE Vision call total.
+    assert mock_provider.analyze_screen.call_count == 1

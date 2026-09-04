@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Optional
 
 import pyautogui
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from app.automation.screen_capture import DEFAULT_OUTPUT_DIR, ScreenCaptureError, capture_screen
 from app.config.settings import (
@@ -47,7 +47,6 @@ from app.config.settings import (
     SEND_VERIFICATION_RETRY_WAIT_SECONDS,
     VISION_CONFIDENCE_THRESHOLD,
 )
-from app.fallback.recovery import call_with_provider_retry
 from app.metrics.step_metrics import estimate_cost
 from app.outlook.draft import ReplyDraftResult, ReplyDraftSteps
 from app.outlook.find_email import TARGET_EMAIL_SENDER, TARGET_EMAIL_SUBJECT, FindOpenEmailSteps
@@ -57,7 +56,7 @@ from app.safety.foreground import get_foreground_window_title, is_outlook_foregr
 from app.safety.validators import GroundingCheckFailure, validate_grounding
 from app.vision.grounding import normalize_1000_to_pixels
 from app.vision.models import SendSearchResponse
-from app.vision.providers.base import VisionProvider
+from app.vision.service import VisionRequest, VisionService
 from rnd.models.click_execution import VerificationResponseV2
 from rnd.models.find_open_email import StepMetrics
 from rnd.models.outlook_launch import CallMetrics
@@ -108,7 +107,7 @@ class SendVerificationAttempt(BaseModel):
 
 
 class SendSteps:
-    """Mixin — expects self.result, self.provider, self.check_abort(),
+    """Mixin — expects self.result, self.vision, self.check_abort(),
     self._accumulate() from the composing class (SendFlowSteps below)."""
 
     def _draft_confirmed_ready(self) -> bool:
@@ -187,34 +186,29 @@ class SendSteps:
         prompt_text = SEND_SEARCH_PROMPT_PATH.read_text(encoding="utf-8").format(
             width=capture.width, height=capture.height,
         )
-        outcome = call_with_provider_retry(
-            lambda: self.provider.analyze_screen(Path(capture.path), "Locate the Send control", prompt_text),
-            stage=STAGE_SEND_GROUNDING, provider_name=self.provider.provider_name,
-        )
-        self.result.provider_retries += outcome.retries_used
-        if outcome.result is None:
+        outcome = self.vision.analyze(VisionRequest(
+            stage=STAGE_SEND_GROUNDING, screenshot_path=Path(capture.path),
+            goal="Locate the Send control", prompt_text=prompt_text, response_model=SendSearchResponse,
+        ))
+        self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+        self.result.fallback_uses += 1 if outcome.fallback_used else 0
+        if outcome.parsed is None:
             self.result.result = "ERROR"
             self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
             self.result.notes = outcome.error
             return False
-        call = outcome.result
+        structured = outcome.parsed
+        call_metrics = outcome.call_metrics
 
         metrics = CallMetrics(
-            latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-            estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+            latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+            output_tokens=call_metrics.output_tokens,
+            estimated_cost=estimate_cost(
+                call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+            ),
         )
         self._accumulate(metrics, self.result.ground_send_metrics)
         self.result.send_grounding_metrics = metrics
-
-        try:
-            structured = SendSearchResponse.model_validate(call.parsed_json) if call.parsed_json else None
-        except ValidationError:
-            structured = None
-        if structured is None:
-            self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-            self.result.notes = "Send-search response was not schema-valid."
-            return False
 
         self.result.send_grounding_target_raw = structured.control_identity
         self.result.send_grounding_confidence = structured.confidence
@@ -366,38 +360,31 @@ class SendSteps:
             prompt_text = STATE_CHECK_PROMPT_PATH.read_text(encoding="utf-8").format(
                 action="Clicked Send exactly once", expected_state=SENT_EXPECTED_STATE,
             )
-            outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(Path(capture.path), "Verify the message was sent", prompt_text),
-                stage=STAGE_SEND_VERIFICATION, provider_name=self.provider.provider_name,
-            )
-            self.result.provider_retries += outcome.retries_used
-            if outcome.result is None:
+            outcome = self.vision.analyze(VisionRequest(
+                stage=STAGE_SEND_VERIFICATION, screenshot_path=Path(capture.path),
+                goal="Verify the message was sent", prompt_text=prompt_text, response_model=VerificationResponseV2,
+            ))
+            self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+            self.result.fallback_uses += 1 if outcome.fallback_used else 0
+            if outcome.parsed is None:
                 attempt.error = outcome.error
                 self.result.send_verification_attempts.append(attempt)
                 self.result.result = "ERROR"
                 self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
                 self.result.notes = outcome.error
                 return False
-            call = outcome.result
+            structured = outcome.parsed
+            call_metrics = outcome.call_metrics
 
             metrics = CallMetrics(
-                latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-                estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+                latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+                output_tokens=call_metrics.output_tokens,
+                estimated_cost=estimate_cost(
+                    call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+                ),
             )
             self._accumulate(metrics, self.result.verify_send_metrics)
             attempt.metrics = metrics
-
-            try:
-                structured = VerificationResponseV2.model_validate(call.parsed_json) if call.parsed_json else None
-            except ValidationError:
-                structured = None
-            if structured is None:
-                attempt.error = "Response was not schema-valid."
-                self.result.send_verification_attempts.append(attempt)
-                self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-                self.result.notes = "Sent-state-verification response was not schema-valid."
-                return False
 
             attempt.schema_valid = True
             attempt.verified = structured.verified
@@ -483,7 +470,7 @@ class SendFlowSteps(SendSteps, ReplyDraftSteps):
     solicited mid-run)."""
 
     def __init__(
-        self, abort_controller: AbortController, provider: VisionProvider, model: str,
+        self, abort_controller: AbortController, vision: VisionService, model: str,
         send_approval_granted: bool,
         target_sender: str = TARGET_EMAIL_SENDER, target_subject: str = TARGET_EMAIL_SUBJECT,
     ) -> None:
@@ -495,11 +482,11 @@ class SendFlowSteps(SendSteps, ReplyDraftSteps):
         user-entered values explicitly, so the defaults are never silently
         used there."""
         self.abort_controller = abort_controller
-        self.provider = provider
+        self.vision = vision
         self.model = model
         self.result = SendResult()
         self.find_open = FindOpenEmailSteps(
-            abort_controller, provider, model, target_sender=target_sender, target_subject=target_subject,
+            abort_controller, vision, model, target_sender=target_sender, target_subject=target_subject,
         )
         self.result.target_subject = self.find_open.result.target_subject
         self.result.target_sender = self.find_open.result.target_sender

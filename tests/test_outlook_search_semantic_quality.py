@@ -30,6 +30,7 @@ from app.outlook.launch import OutlookLaunchSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.providers.base import NetworkError  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 from app.workers.outlook_launch_worker import OutlookLaunchWorker  # noqa: E402
 
 MODULE = "app.outlook.launch"
@@ -40,7 +41,7 @@ _ENV_MISMATCH = {"pyautogui_width": 1536, "pyautogui_height": 864, "dimensions_m
 
 
 def _steps() -> OutlookLaunchSteps:
-    steps = OutlookLaunchSteps(AbortController(), MagicMock(), "claude-sonnet-5")
+    steps = OutlookLaunchSteps(AbortController(), VisionService(MagicMock(), fallback=None), "claude-sonnet-5")
     steps.result.screen_width, steps.result.screen_height = 1920, 1080
     return steps
 
@@ -65,7 +66,7 @@ def _call(
 
 
 def _ground(steps: OutlookLaunchSteps, call, env=None) -> bool:
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.get_environment_info", return_value=env or _ENV_MATCH):
         return steps.ground_search_result(_capture())
 
@@ -205,9 +206,9 @@ def test_H_non_square_1920x1080_and_alternate_resolution_both_correct():
     steps_a = _steps()
     assert _ground(steps_a, _call()) is True
 
-    steps_b = OutlookLaunchSteps(AbortController(), MagicMock(), "claude-sonnet-5")
+    steps_b = OutlookLaunchSteps(AbortController(), VisionService(MagicMock(), fallback=None), "claude-sonnet-5")
     steps_b.result.screen_width, steps_b.result.screen_height = 2560, 1440
-    steps_b.provider.analyze_screen.return_value = _call()
+    steps_b.vision.primary.analyze_screen.return_value = _call()
     with patch(f"{MODULE}.get_environment_info",
                return_value={"pyautogui_width": 2560, "pyautogui_height": 1440, "dimensions_match": True}):
         assert steps_b.ground_search_result(_capture(2560, 1440)) is True
@@ -229,7 +230,7 @@ def test_I_coordinate_space_mismatch_blocks_before_vision_call():
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_MISMATCH):
         assert steps.ground_search_result(_capture()) is False
     assert steps.result.failure_reason == LaunchFailureReason.COORDINATE_SPACE_MISMATCH
-    steps.provider.analyze_screen.assert_not_called()
+    steps.vision.primary.analyze_screen.assert_not_called()
 
 
 # --- J: foreground changes before click ---
@@ -325,7 +326,7 @@ def test_N_click_executes_but_outlook_never_opens_logs_prove_click(caplog):
 
     titles = itertools.chain(["Search", "Search", "Search"], itertools.repeat("Untitled - Notepad"))
 
-    with patch(f"{WORKER_MODULE}._provider", return_value=(mock_provider, "claude-sonnet-5")), \
+    with patch(f"{WORKER_MODULE}._provider", return_value=(VisionService(mock_provider, fallback=None), "claude-sonnet-5")), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{MODULE}.time.sleep"), \
          patch(f"{MODULE}.get_foreground_window_title", side_effect=titles), \
@@ -362,7 +363,7 @@ def test_O_click_executes_and_outlook_becomes_ready_success():
 
     titles = itertools.chain(["Search", "Search", "Search"], itertools.repeat("Inbox - Outlook"))
 
-    with patch(f"{WORKER_MODULE}._provider", return_value=(mock_provider, "claude-sonnet-5")), \
+    with patch(f"{WORKER_MODULE}._provider", return_value=(VisionService(mock_provider, fallback=None), "claude-sonnet-5")), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{MODULE}.time.sleep"), \
          patch(f"{MODULE}.get_foreground_window_title", side_effect=titles), \
@@ -437,7 +438,7 @@ def test_R_malformed_json_is_safe_schema_failure_zero_action():
         raw_text="this is not json at all", model="claude-sonnet-5",
         latency_ms=100.0, input_tokens=10, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_MATCH):
         assert steps.ground_search_result(_capture()) is False
     assert steps.result.failure_reason == LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
@@ -448,14 +449,14 @@ def test_R_malformed_json_is_safe_schema_failure_zero_action():
 
 def test_S_transient_provider_error_retries_then_succeeds():
     steps = _steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         NetworkError("[Errno 10054] connection reset"),
         _call(),
     ]
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_MATCH):
         assert steps.ground_search_result(_capture()) is True
     assert steps.result.provider_retries == 1
-    assert steps.provider.analyze_screen.call_count == 2
+    assert steps.vision.primary.analyze_screen.call_count == 2
 
     # And exactly one grounding result was produced — no duplicate
     # click-eligible state was left behind by the retry.
@@ -471,7 +472,7 @@ def test_S_transient_provider_error_retries_then_succeeds():
 
 def test_T_provider_error_exhausts_retries_final_technical_error_zero_action():
     steps = _steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         NetworkError("[Errno 10054] connection reset"),
         NetworkError("[Errno 10054] connection reset"),
     ]

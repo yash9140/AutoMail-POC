@@ -38,6 +38,13 @@ class SessionMetrics(BaseModel):
     human_interventions: int = 0
     safety_aborts: int = 0
 
+    # Claude-primary/Gemini-fallback architecture (2026-09-05). Populated
+    # from the worker's steps.result.fallback_uses, which every Outlook
+    # step already accumulates via VisionService's per-call
+    # outcome.fallback_used (see app/vision/service.py). 0 whenever no
+    # fallback is configured or the primary never technically failed.
+    fallback_count: int = 0
+
     # Send is the one action in this whole project that must never exceed
     # one per session. This counter exists now, at zero, specifically so a
     # future stage has somewhere to enforce that ceiling — not because

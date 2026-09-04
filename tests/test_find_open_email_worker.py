@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.outlook.find_email import TARGET_EMAIL_SENDER, TARGET_EMAIL_SUBJECT  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 from app.workers.find_open_email_worker import FindOpenEmailWorker  # noqa: E402
 
 STEPS_MODULE = "app.outlook.find_email"
@@ -81,7 +82,7 @@ def test_bounded_approval_true_runs_end_to_end_to_success():
         itertools.repeat("Inbox - Outlook"),  # poll, readiness, email grounding/click, verification
     )
 
-    with patch(f"{WORKER_MODULE}._provider", return_value=(mock_provider, "gemini-3.6-flash")), \
+    with patch(f"{WORKER_MODULE}._provider", return_value=(VisionService(mock_provider, fallback=None), "gemini-3.6-flash")), \
          patch(f"{LAUNCH_MODULE}.pyautogui") as mock_launch_pyautogui, \
          patch(f"{STEPS_MODULE}.pyautogui") as mock_email_pyautogui, \
          patch(f"{LAUNCH_MODULE}.time.sleep"), patch(f"{STEPS_MODULE}.time.sleep"), \
@@ -154,7 +155,7 @@ def test_target_email_not_visible_stops_after_bounded_scroll():
 
     titles = itertools.chain(["Search", "Search", "Search"], itertools.repeat("Inbox - Outlook"))
 
-    with patch(f"{WORKER_MODULE}._provider", return_value=(mock_provider, "gemini-3.6-flash")), \
+    with patch(f"{WORKER_MODULE}._provider", return_value=(VisionService(mock_provider, fallback=None), "gemini-3.6-flash")), \
          patch(f"{LAUNCH_MODULE}.pyautogui") as mock_launch_pyautogui, \
          patch(f"{STEPS_MODULE}.pyautogui") as mock_email_pyautogui, \
          patch("app.automation.scrolling.pyautogui") as mock_scroll_pyautogui, \

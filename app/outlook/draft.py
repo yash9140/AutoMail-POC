@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Optional
 
 import pyautogui
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from app.automation.screen_capture import DEFAULT_OUTPUT_DIR, ScreenCaptureError, capture_screen
 from app.config.settings import (
@@ -43,7 +43,6 @@ from app.config.settings import (
     POST_TYPING_WAIT_SECONDS,
     TYPE_INTERVAL_SECONDS,
 )
-from app.fallback.recovery import call_with_provider_retry
 from app.metrics.step_metrics import estimate_cost
 from app.outlook.find_email import FindOpenEmailSteps
 from app.outlook.read_email import EmailUnderstandingSteps
@@ -52,7 +51,7 @@ from app.playbook.failure_reasons import LaunchFailureReason
 from app.safety.abort_controller import AbortController
 from app.safety.foreground import get_foreground_window_title, is_outlook_foreground
 from app.vision.models import EmailSection
-from app.vision.providers.base import VisionProvider
+from app.vision.service import VisionRequest, VisionService
 from rnd.models.contextual_reply import ReplyGenerationResponse
 from rnd.models.find_open_email import StepMetrics
 from rnd.models.outlook_launch import CallMetrics
@@ -125,7 +124,7 @@ def _validate_draft_quality(draft: str) -> tuple[bool, str]:
 
 
 class DraftSteps:
-    """Mixin — expects self.result, self.provider, self.check_abort(),
+    """Mixin — expects self.result, self.vision, self.check_abort(),
     self._accumulate() from the composing class (ReplyDraftSteps below)."""
 
     def generate_draft(self) -> bool:
@@ -154,34 +153,33 @@ class DraftSteps:
             self.result.notes = f"Capture failed: {exc}"
             return False
 
-        outcome = call_with_provider_retry(
-            lambda: self.provider.analyze_screen(Path(capture.path), "Draft a reply", prompt_text),
-            stage=STAGE_DRAFT_GENERATION, provider_name=self.provider.provider_name,
-        )
-        self.result.provider_retries += outcome.retries_used
-        if outcome.result is None:
+        outcome = self.vision.analyze(VisionRequest(
+            stage=STAGE_DRAFT_GENERATION, screenshot_path=Path(capture.path),
+            goal="Draft a reply", prompt_text=prompt_text, response_model=ReplyGenerationResponse,
+        ))
+        self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+        self.result.fallback_uses += 1 if outcome.fallback_used else 0
+        if outcome.parsed is None:
             self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-            self.result.notes = outcome.error
+            if outcome.schema_invalid:
+                self.result.failure_reason = LaunchFailureReason.DRAFT_GENERATION_FAILED
+                self.result.notes = "Reply-generation response was not schema-valid."
+            else:
+                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
+                self.result.notes = outcome.error
             return False
-        call = outcome.result
+        structured = outcome.parsed
+        call_metrics = outcome.call_metrics
 
         metrics = CallMetrics(
-            latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-            estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+            latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+            output_tokens=call_metrics.output_tokens,
+            estimated_cost=estimate_cost(
+                call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+            ),
         )
         self._accumulate(metrics, self.result.generate_draft_metrics)
         self.result.reply_generation_metrics = metrics
-
-        try:
-            structured = ReplyGenerationResponse.model_validate(call.parsed_json) if call.parsed_json else None
-        except ValidationError:
-            structured = None
-        if structured is None:
-            self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.DRAFT_GENERATION_FAILED
-            self.result.notes = "Reply-generation response was not schema-valid."
-            return False
 
         self.result.draft_generated_at = datetime.now().isoformat()
         self.result.draft_generation_ms = round((time.monotonic() - self._draft_start_monotonic) * 1000, 1)
@@ -320,39 +318,35 @@ class DraftSteps:
             attempt.screenshot = capture.filename
             self.result.post_typing_screenshot = capture.filename
 
-            outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(Path(capture.path), "Verify typed draft", prompt_text),
-                stage=STAGE_DRAFT_VERIFICATION, provider_name=self.provider.provider_name, max_retries=0,
+            outcome = self.vision.analyze(
+                VisionRequest(
+                    stage=STAGE_DRAFT_VERIFICATION, screenshot_path=Path(capture.path),
+                    goal="Verify typed draft", prompt_text=prompt_text, response_model=DraftVerificationResponseV2,
+                ),
+                max_retries=0,
             )
-            self.result.provider_retries += outcome.retries_used
-            if outcome.result is None:
+            self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+            self.result.fallback_uses += 1 if outcome.fallback_used else 0
+            if outcome.parsed is None:
                 attempt.error = outcome.error
                 self.result.draft_verification_attempts.append(attempt)
                 self.result.result = "ERROR"
                 self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
                 self.result.notes = outcome.error
                 return False
-            call = outcome.result
+            structured = outcome.parsed
+            call_metrics = outcome.call_metrics
 
             metrics = CallMetrics(
-                latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-                estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+                latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+                output_tokens=call_metrics.output_tokens,
+                estimated_cost=estimate_cost(
+                    call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+                ),
             )
             self._accumulate(metrics, self.result.verify_draft_metrics)
             self.result.draft_verification_metrics = metrics
             attempt.metrics = metrics
-
-            try:
-                structured = DraftVerificationResponseV2.model_validate(call.parsed_json) if call.parsed_json else None
-            except ValidationError:
-                structured = None
-            if structured is None:
-                attempt.error = "Response was not schema-valid."
-                self.result.draft_verification_attempts.append(attempt)
-                self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-                self.result.notes = "Draft-verification response was not schema-valid."
-                return False
 
             attempt.schema_valid = True
             attempt.reply_editor_open = structured.reply_editor_open
@@ -405,6 +399,7 @@ class ReplyDraftResult(RND009DResult):
     _finalize_understanding())."""
 
     provider_retries: int = 0
+    fallback_uses: int = 0
     reply_expectation: Optional[str] = None
     requires_user_decision: Optional[bool] = None
 
@@ -445,12 +440,12 @@ class ReplyDraftResult(RND009DResult):
 
 
 class ReplyDraftSteps(EmailUnderstandingSteps, ReplyDiscoverySteps, DraftSteps):
-    def __init__(self, abort_controller: AbortController, provider: VisionProvider, model: str) -> None:
+    def __init__(self, abort_controller: AbortController, vision: VisionService, model: str) -> None:
         self.abort_controller = abort_controller
-        self.provider = provider
+        self.vision = vision
         self.model = model
         self.result = ReplyDraftResult()
-        self.find_open = FindOpenEmailSteps(abort_controller, provider, model)
+        self.find_open = FindOpenEmailSteps(abort_controller, vision, model)
         self.result.target_subject = self.find_open.result.target_subject
         self.result.target_sender = self.find_open.result.target_sender
         self._session_start_monotonic: Optional[float] = None
@@ -513,14 +508,16 @@ class ReplyDraftSteps(EmailUnderstandingSteps, ReplyDiscoverySteps, DraftSteps):
                 continue  # this stage's own start_session()/finalize_session() own these
             setattr(self.result, field_name, getattr(fo.result, field_name))
 
-        # provider_retries is declared on FindEmailResult (app/outlook/find_email.py),
-        # an app-level addition over RND009CResult — it is NOT in
-        # RND009CResult.model_fields, so the loop above never copies it.
-        # Folded in explicitly here, same convention as
-        # FindOpenEmailSteps.run_launch_and_readiness()'s own
-        # `r.provider_retries += lr.provider_retries` one layer down —
-        # every Phase 1-4 provider retry must reach this stage's total.
+        # provider_retries/fallback_uses are declared on FindEmailResult
+        # (app/outlook/find_email.py), app-level additions over
+        # RND009CResult — NOT in RND009CResult.model_fields, so the loop
+        # above never copies them. Folded in explicitly here, same
+        # convention as FindOpenEmailSteps.run_launch_and_readiness()'s
+        # own `r.provider_retries += lr.provider_retries` one layer down
+        # — every Phase 1-4 provider retry/fallback use must reach this
+        # stage's total.
         self.result.provider_retries += fo.result.provider_retries
+        self.result.fallback_uses += fo.result.fallback_uses
 
         if not ok:
             self.result.result = fo.result.result

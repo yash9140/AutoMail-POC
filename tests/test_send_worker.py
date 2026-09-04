@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.outlook.find_email import TARGET_EMAIL_SENDER, TARGET_EMAIL_SUBJECT  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 from app.workers.send_worker import SendWorker  # noqa: E402
 
 LAUNCH_MODULE = "app.outlook.launch"
@@ -189,7 +190,7 @@ def test_full_chain_reaches_sent_verified():
         itertools.repeat("Inbox - Outlook"),
     )
 
-    with patch(f"{WORKER_MODULE}._provider", return_value=(mock_provider, "gemini-3.6-flash")), ExitStack() as stack:
+    with patch(f"{WORKER_MODULE}._provider", return_value=(VisionService(mock_provider, fallback=None), "gemini-3.6-flash")), ExitStack() as stack:
         mocks = _patch_full_chain(stack, titles)
         worker.run()
 
@@ -231,7 +232,7 @@ def test_send_not_approved_zero_click():
     ]
     titles = itertools.chain(["Search", "Search", "Search"], itertools.repeat("Inbox - Outlook"))
 
-    with patch(f"{WORKER_MODULE}._provider", return_value=(mock_provider, "gemini-3.6-flash")), ExitStack() as stack:
+    with patch(f"{WORKER_MODULE}._provider", return_value=(VisionService(mock_provider, fallback=None), "gemini-3.6-flash")), ExitStack() as stack:
         mocks = _patch_full_chain(stack, titles)
         worker.run()
         mocks["send"].click.assert_not_called()
@@ -256,7 +257,7 @@ def test_verification_uncertain_keeps_click_count_one_end_to_end():
     ]
     titles = itertools.chain(["Search", "Search", "Search"], itertools.repeat("Inbox - Outlook"))
 
-    with patch(f"{WORKER_MODULE}._provider", return_value=(mock_provider, "gemini-3.6-flash")), ExitStack() as stack:
+    with patch(f"{WORKER_MODULE}._provider", return_value=(VisionService(mock_provider, fallback=None), "gemini-3.6-flash")), ExitStack() as stack:
         mocks = _patch_full_chain(stack, titles)
         worker.run()
 

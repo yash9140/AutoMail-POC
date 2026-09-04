@@ -27,8 +27,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from pydantic import ValidationError
-
 from app.automation.screen_capture import DEFAULT_OUTPUT_DIR, ScreenCaptureError, capture_screen
 from app.automation.scrolling import scroll_email_body
 from app.config.settings import (
@@ -36,7 +34,6 @@ from app.config.settings import (
     EMAIL_SECTION_TAIL_CHARS,
     MAX_EMAIL_BODY_SCROLL_ATTEMPTS,
 )
-from app.fallback.recovery import call_with_provider_retry
 from app.metrics.step_metrics import estimate_cost
 from app.playbook.failure_reasons import LaunchFailureReason
 from app.safety.foreground import get_foreground_window_title, is_outlook_foreground
@@ -46,6 +43,7 @@ from app.vision.models import (
     EmailSectionExtractionResponse,
     ReplyExpectation,
 )
+from app.vision.service import VisionRequest
 from rnd.models.outlook_launch import CallMetrics
 
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "app" / "vision" / "prompts"
@@ -86,7 +84,7 @@ def _merge_unique(*lists: list[str]) -> list[str]:
 
 
 class EmailUnderstandingSteps:
-    """Mixin — expects self.result, self.provider, self.check_abort(),
+    """Mixin — expects self.result, self.vision, self.check_abort(),
     self._accumulate() from the composing class (app.outlook.draft.ReplyDraftSteps)."""
 
     def understand_email(self) -> bool:
@@ -119,34 +117,34 @@ class EmailUnderstandingSteps:
             prompt_text = EMAIL_SECTION_EXTRACTION_PROMPT_PATH.read_text(encoding="utf-8").format(
                 already_read_tail=already_read_tail, section_index=section_index,
             )
-            outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(Path(capture.path), "Read this section of the open email", prompt_text),
-                stage=STAGE_EMAIL_SECTION_EXTRACTION, provider_name=self.provider.provider_name,
-            )
-            self.result.provider_retries += outcome.retries_used
-            if outcome.result is None:
+            outcome = self.vision.analyze(VisionRequest(
+                stage=STAGE_EMAIL_SECTION_EXTRACTION, screenshot_path=Path(capture.path),
+                goal="Read this section of the open email", prompt_text=prompt_text,
+                response_model=EmailSectionExtractionResponse,
+            ))
+            self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+            self.result.fallback_uses += 1 if outcome.fallback_used else 0
+            if outcome.parsed is None:
                 self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-                self.result.notes = outcome.error
+                if outcome.schema_invalid:
+                    self.result.failure_reason = LaunchFailureReason.EMAIL_UNDERSTANDING_FAILED
+                    self.result.notes = f"Email-section-extraction response was not schema-valid (section {section_index})."
+                else:
+                    self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
+                    self.result.notes = outcome.error
                 return False
-            call = outcome.result
+            raw = outcome.parsed
+            call_metrics = outcome.call_metrics
 
             metrics = CallMetrics(
-                latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-                estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+                latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+                output_tokens=call_metrics.output_tokens,
+                estimated_cost=estimate_cost(
+                    call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+                ),
             )
             self._accumulate(metrics, self.result.understand_email_metrics)
             self.result.email_understanding_metrics = metrics
-
-            try:
-                raw = EmailSectionExtractionResponse.model_validate(call.parsed_json) if call.parsed_json else None
-            except ValidationError:
-                raw = None
-            if raw is None:
-                self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.EMAIL_UNDERSTANDING_FAILED
-                self.result.notes = f"Email-section-extraction response was not schema-valid (section {section_index})."
-                return False
 
             stripped_content = _strip_overlap(raw.extracted_visible_content, raw.overlap_text)
 
@@ -257,33 +255,33 @@ class EmailUnderstandingSteps:
         prompt_text = EMAIL_HOLISTIC_ASSESSMENT_PROMPT_PATH.read_text(encoding="utf-8").format(
             full_email_text=full_text,
         )
-        outcome = call_with_provider_retry(
-            lambda: self.provider.analyze_screen(Path(capture.path), "Classify the email's reply expectation", prompt_text),
-            stage=STAGE_EMAIL_HOLISTIC_ASSESSMENT, provider_name=self.provider.provider_name,
-        )
-        self.result.provider_retries += outcome.retries_used
-        if outcome.result is None:
+        outcome = self.vision.analyze(VisionRequest(
+            stage=STAGE_EMAIL_HOLISTIC_ASSESSMENT, screenshot_path=Path(capture.path),
+            goal="Classify the email's reply expectation", prompt_text=prompt_text,
+            response_model=EmailHolisticAssessmentResponse,
+        ))
+        self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+        self.result.fallback_uses += 1 if outcome.fallback_used else 0
+        if outcome.parsed is None:
             self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-            self.result.notes = outcome.error
+            if outcome.schema_invalid:
+                self.result.failure_reason = LaunchFailureReason.EMAIL_UNDERSTANDING_FAILED
+                self.result.notes = "Email holistic-assessment response was not schema-valid."
+            else:
+                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
+                self.result.notes = outcome.error
             return False
-        call = outcome.result
+        raw = outcome.parsed
+        call_metrics = outcome.call_metrics
 
         metrics = CallMetrics(
-            latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-            estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+            latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+            output_tokens=call_metrics.output_tokens,
+            estimated_cost=estimate_cost(
+                call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+            ),
         )
         self._accumulate(metrics, self.result.understand_email_metrics)
-
-        try:
-            raw = EmailHolisticAssessmentResponse.model_validate(call.parsed_json) if call.parsed_json else None
-        except ValidationError:
-            raw = None
-        if raw is None:
-            self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.EMAIL_UNDERSTANDING_FAILED
-            self.result.notes = "Email holistic-assessment response was not schema-valid."
-            return False
 
         last = self.result.email_sections[-1]
         last.reply_expectation = raw.reply_expectation

@@ -30,6 +30,7 @@ from app.vision.providers.anthropic_provider import AnthropicProvider  # noqa: E
 from app.vision.providers.base import NetworkError, ProviderCallResult  # noqa: E402
 from app.vision.providers.gemini_provider import GeminiProvider  # noqa: E402
 from app.vision.providers.openai_provider import OpenAIProvider  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 from app.workers.send_worker import SendWorker  # noqa: E402
 
 LAUNCH_MODULE = "app.outlook.launch"
@@ -334,13 +335,13 @@ def test_K_malformed_claude_json_fails_safely_not_silently_repaired():
     typed technical failure, never a silent pass."""
     from app.outlook.find_email import FindOpenEmailSteps
 
-    steps = FindOpenEmailSteps(AbortController(), MagicMock(), "claude-sonnet-4-20250514")
+    steps = FindOpenEmailSteps(AbortController(), VisionService(MagicMock(), fallback=None), "claude-sonnet-4-20250514")
     steps.result.ready_for_interaction = True
     malformed = ProviderCallResult(
         raw_text="not valid json at all", parsed_json=None, model="claude-sonnet-4-20250514",
         latency_ms=5.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = malformed
+    steps.vision.primary.analyze_screen.return_value = malformed
     with patch(f"{FIND_MODULE}.get_foreground_window_title", return_value="Inbox - Outlook"), \
          patch(f"{FIND_MODULE}.capture_screen", return_value=MagicMock(filename="x.png", path="x.png", width=1920, height=1080)):
         assert steps.find_target_email() is False

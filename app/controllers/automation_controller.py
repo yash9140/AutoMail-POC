@@ -283,6 +283,8 @@ class AutomationController(QObject):
         self.metrics.output_tokens = result.get("total_output_tokens", 0)
         self.metrics.estimated_cost = result.get("total_estimated_cost", 0.0)
         self.metrics.total_latency_ms = result.get("total_latency_ms", 0.0)
+        self.metrics.retries = result.get("provider_retries", 0)
+        self.metrics.fallback_count = result.get("fallback_uses", 0)
         self.page.set_playbook_status("Active")
         # Button re-enable/thread teardown are NOT done here — they only
         # happen once the worker.finished -> thread.finished signal chain

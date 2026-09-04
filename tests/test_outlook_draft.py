@@ -18,6 +18,7 @@ from app.outlook.find_email import TARGET_EMAIL_SENDER, TARGET_EMAIL_SUBJECT  # 
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.providers.base import NetworkError  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 
 MODULE = "app.outlook.draft"
 LAUNCH_MODULE = "app.outlook.launch"
@@ -25,7 +26,7 @@ FIND_MODULE = "app.outlook.find_email"
 
 
 def _steps() -> ReplyDraftSteps:
-    return ReplyDraftSteps(AbortController(), MagicMock(), "gemini-3.6-flash")
+    return ReplyDraftSteps(AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash")
 
 
 def _capture(width=1920, height=1080, filename="draft.png"):
@@ -67,7 +68,7 @@ def test_generated_draft_from_understanding_passes_quality_gate():
                      "reasoning_summary": "acknowledges the request", "confidence": 0.9},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.generate_draft() is True
     assert steps.result.draft_reply == "Sure, I will complete this by EOD today."
@@ -81,7 +82,7 @@ def test_empty_generated_draft_fails_quality_gate():
         parsed_json={"draft_reply": "", "reasoning_summary": "nothing", "confidence": 0.9},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.generate_draft() is False
     assert steps.result.failure_reason == LaunchFailureReason.DRAFT_VALIDATION_FAILED
@@ -105,22 +106,22 @@ def test_generate_draft_retries_once_after_a_transient_failure_then_succeeds():
                      "reasoning_summary": "acknowledges the request", "confidence": 0.9},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.side_effect = [NetworkError("timed out"), good_call]
+    steps.vision.primary.analyze_screen.side_effect = [NetworkError("timed out"), good_call]
     with patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.generate_draft() is True
     assert steps.result.draft_reply == "Sure, I will complete this by EOD today."
-    assert steps.provider.analyze_screen.call_count == 2
+    assert steps.vision.primary.analyze_screen.call_count == 2
     assert steps.result.provider_retries == 1
 
 
 def test_generate_draft_fails_safe_when_both_attempts_time_out():
     steps = _steps()
     _seed_understanding(steps)
-    steps.provider.analyze_screen.side_effect = [NetworkError("timed out"), NetworkError("timed out")]
+    steps.vision.primary.analyze_screen.side_effect = [NetworkError("timed out"), NetworkError("timed out")]
     with patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.generate_draft() is False
     assert steps.result.failure_reason == LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-    assert steps.provider.analyze_screen.call_count == 2
+    assert steps.vision.primary.analyze_screen.call_count == 2
     assert steps.result.draft_reply is None
 
 
@@ -237,7 +238,7 @@ def test_draft_verification_full_content_passes():
                      "confidence": 0.95, "reason": "matches"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_draft() is True
@@ -254,7 +255,7 @@ def test_failed_verification_does_not_retype():
                      "confidence": 0.4, "reason": "mismatch"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -302,7 +303,7 @@ def _verifiable_steps() -> ReplyDraftSteps:
 
 def test_verification_succeeds_on_second_attempt():
     steps = _verifiable_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _verify_call(False, detected="garbled text"),
         _verify_call(True, detected="Sure, will do."),
     ]
@@ -311,7 +312,7 @@ def test_verification_succeeds_on_second_attempt():
          patch(f"{MODULE}.capture_screen", side_effect=captures):
         assert steps.verify_draft() is True
     assert steps.result.result == "PASS"
-    assert steps.provider.analyze_screen.call_count == 2
+    assert steps.vision.primary.analyze_screen.call_count == 2
     assert len(steps.result.draft_verification_attempts) == 2
     assert steps.result.draft_verification_attempts[0].semantic_match is False
     assert steps.result.draft_verification_attempts[1].semantic_match is True
@@ -320,7 +321,7 @@ def test_verification_succeeds_on_second_attempt():
 
 def test_verification_exhausts_attempts_and_fails_safely():
     steps = _verifiable_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _verify_call(False, detected="garbled 1"),
         _verify_call(False, detected="garbled 2"),
     ]
@@ -330,13 +331,13 @@ def test_verification_exhausts_attempts_and_fails_safely():
         assert steps.verify_draft() is False
     assert steps.result.result == "FAIL"
     assert steps.result.failure_reason == LaunchFailureReason.DRAFT_VERIFICATION_FAILED
-    assert steps.provider.analyze_screen.call_count == MAX_DRAFT_VERIFICATION_ATTEMPTS
+    assert steps.vision.primary.analyze_screen.call_count == MAX_DRAFT_VERIFICATION_ATTEMPTS
     assert len(steps.result.draft_verification_attempts) == MAX_DRAFT_VERIFICATION_ATTEMPTS
 
 
 def test_verification_retries_never_retype_or_reclick():
     steps = _verifiable_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _verify_call(False, detected="garbled text"),
         _verify_call(True, detected="Sure, will do."),
     ]
@@ -362,7 +363,7 @@ def test_phase6_generation_typing_verification_metrics_populated():
                      "reasoning_summary": "acknowledges the request", "confidence": 0.9},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = gen_call
+    steps.vision.primary.analyze_screen.return_value = gen_call
     with patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.generate_draft() is True
     assert steps.result.draft_generation_started_at is not None
@@ -384,7 +385,7 @@ def test_phase6_generation_typing_verification_metrics_populated():
                      "detected_draft": steps.result.draft_reply, "confidence": 0.95, "reason": "matches"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=5, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = verify_call
+    steps.vision.primary.analyze_screen.return_value = verify_call
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_draft() is True
@@ -520,7 +521,7 @@ def _titles():
 
 def test_provider_retries_zero_when_first_call_succeeds():
     steps = _steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _search_grounding(), _readiness_ready(), _email_grounding(), _email_open_verified(),
     ]
     with ExitStack() as stack:
@@ -531,7 +532,7 @@ def test_provider_retries_zero_when_first_call_succeeds():
 
 def test_provider_retries_one_when_first_grounding_call_fails_then_succeeds():
     steps = _steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         NetworkError("[Errno 10054] connection reset"),  # 1st attempt at Windows-Search grounding fails
         _search_grounding(),                              # retry succeeds
         _readiness_ready(), _email_grounding(), _email_open_verified(),
@@ -545,7 +546,7 @@ def test_provider_retries_one_when_first_grounding_call_fails_then_succeeds():
 
 def test_provider_retries_one_and_failure_retained_when_both_attempts_fail():
     steps = _steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         NetworkError("[Errno 10054] connection reset"),
         NetworkError("[Errno 10054] connection reset"),
     ]
@@ -561,7 +562,7 @@ def test_provider_retries_one_and_failure_retained_when_both_attempts_fail():
 
 def test_provider_retry_never_repeats_windows_key_search_typing_or_click():
     steps = _steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         NetworkError("[Errno 10054] connection reset"),
         _search_grounding(),
         _readiness_ready(), _email_grounding(), _email_open_verified(),

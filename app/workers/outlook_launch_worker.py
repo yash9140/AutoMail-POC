@@ -59,12 +59,12 @@ class OutlookLaunchWorker(QObject):
         self.safety_status.emit("Armed")
 
         try:
-            provider, model = _provider()
+            vision, model = _provider()
         except SystemExit as exc:
             self.failure.emit(LaunchFailureReason.TECHNICAL_PROVIDER_ERROR, str(exc))
             return
 
-        steps = OutlookLaunchSteps(self.abort_controller, provider, model)
+        steps = OutlookLaunchSteps(self.abort_controller, vision, model)
 
         self.log_message.emit("Pressing Windows key")
         if not steps.press_windows_key():

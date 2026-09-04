@@ -15,12 +15,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.outlook.launch import OutlookLaunchSteps, TYPE_INTERVAL_SECONDS  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 
 MODULE = "app.outlook.launch"
 
 
 def _steps() -> OutlookLaunchSteps:
-    return OutlookLaunchSteps(AbortController(), MagicMock(), "gemini-3.6-flash")
+    return OutlookLaunchSteps(AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash")
 
 
 def _capture(width=1920, height=1080, filename="search.png"):
@@ -78,7 +79,7 @@ def test_grounding_converts_0_1000_coordinates_to_pixels():
                      "bbox": [200.0, 400.0, 300.0, 600.0], "confidence": 0.9, "reason": "clear match"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=100.0, input_tokens=10, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert steps.ground_search_result(_capture()) is True
@@ -106,7 +107,7 @@ def test_out_of_normalized_range_bbox_rejected():
                      "bbox": [1200.0, 1200.0, 1400.0, 1400.0], "confidence": 0.9, "reason": "far off"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=100.0, input_tokens=10, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert steps.ground_search_result(_capture()) is False
@@ -122,7 +123,7 @@ def test_low_confidence_rejected():
                      "bbox": [200.0, 400.0, 300.0, 600.0], "confidence": 0.1, "reason": "unsure"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=100.0, input_tokens=10, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert steps.ground_search_result(_capture()) is False
@@ -138,7 +139,7 @@ def test_non_outlook_result_rejected():
                      "bbox": [200.0, 400.0, 300.0, 600.0], "confidence": 0.9, "reason": "wrong app"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=100.0, input_tokens=10, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
 
     with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
         assert steps.ground_search_result(_capture()) is False
@@ -192,7 +193,7 @@ def test_splash_screen_not_counted_as_ready():
         },
         raw_text="{}", model="gemini-3.6-flash", latency_ms=100.0, input_tokens=10, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_outlook_readiness() is False
@@ -210,7 +211,7 @@ def test_ready_for_interaction_passes_on_first_attempt():
         },
         raw_text="{}", model="gemini-3.6-flash", latency_ms=100.0, input_tokens=10, output_tokens=5,
     )
-    steps.provider.analyze_screen.return_value = call
+    steps.vision.primary.analyze_screen.return_value = call
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_outlook_readiness() is True
@@ -223,7 +224,7 @@ def test_ready_for_interaction_passes_on_first_attempt():
 def test_abort_blocks_before_windows_key():
     controller = AbortController()
     controller.request_abort()
-    steps = OutlookLaunchSteps(controller, MagicMock(), "gemini-3.6-flash")
+    steps = OutlookLaunchSteps(controller, VisionService(MagicMock(), fallback=None), "gemini-3.6-flash")
     assert steps.press_windows_key() is False
     assert steps.result.result == "ABORTED"
     assert steps.result.failure_reason == LaunchFailureReason.USER_ABORTED

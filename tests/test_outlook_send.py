@@ -18,12 +18,13 @@ from app.outlook.send import SendFlowSteps, SendResult, SendSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.providers.base import VisionProviderError  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 
 MODULE = "app.outlook.send"
 
 
 def _steps(send_approval_granted: bool = True) -> SendFlowSteps:
-    return SendFlowSteps(AbortController(), MagicMock(), "gemini-3.6-flash", send_approval_granted)
+    return SendFlowSteps(AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash", send_approval_granted)
 
 
 def _ready_steps(send_approval_granted: bool = True) -> SendFlowSteps:
@@ -89,7 +90,7 @@ def test_precondition_passes_when_everything_satisfied():
 
 def test_invalid_bbox_zero_click():
     steps = _ready_steps()
-    steps.provider.analyze_screen.return_value = _send_search_call(bbox=None)
+    steps.vision.primary.analyze_screen.return_value = _send_search_call(bbox=None)
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -102,7 +103,7 @@ def test_invalid_bbox_zero_click():
 
 def test_out_of_range_bbox_zero_click():
     steps = _ready_steps()
-    steps.provider.analyze_screen.return_value = _send_search_call(bbox=(400.0, 800.0, 440.0, 1500.0))
+    steps.vision.primary.analyze_screen.return_value = _send_search_call(bbox=(400.0, 800.0, 440.0, 1500.0))
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -115,7 +116,7 @@ def test_out_of_range_bbox_zero_click():
 
 def test_low_confidence_zero_click():
     steps = _ready_steps()
-    steps.provider.analyze_screen.return_value = _send_search_call(confidence=0.1)
+    steps.vision.primary.analyze_screen.return_value = _send_search_call(confidence=0.1)
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -128,7 +129,7 @@ def test_low_confidence_zero_click():
 
 def test_wrong_semantic_control_zero_click():
     steps = _ready_steps()
-    steps.provider.analyze_screen.return_value = _send_search_call(identity="Schedule Send")
+    steps.vision.primary.analyze_screen.return_value = _send_search_call(identity="Schedule Send")
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -174,7 +175,7 @@ def test_foreground_lost_between_move_and_click_zero_click():
 
 def test_provider_transient_error_during_grounding_retries_then_succeeds():
     steps = _ready_steps()
-    steps.provider.analyze_screen.side_effect = [VisionProviderError("timeout"), _send_search_call()]
+    steps.vision.primary.analyze_screen.side_effect = [VisionProviderError("timeout"), _send_search_call()]
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -189,7 +190,7 @@ def test_provider_transient_error_during_grounding_retries_then_succeeds():
 
 def test_full_send_flow_one_click_then_verified():
     steps = _ready_steps()
-    steps.provider.analyze_screen.side_effect = [_send_search_call(), _sent_verify_call(True)]
+    steps.vision.primary.analyze_screen.side_effect = [_send_search_call(), _sent_verify_call(True)]
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"):
         assert steps.validate_send_preconditions() is True
         with patch(f"{MODULE}.capture_screen", return_value=_capture()), \
@@ -213,7 +214,7 @@ def test_verification_uncertain_then_succeeds_click_count_stays_one():
     steps = _ready_steps()
     steps.result.send_click_executed = True
     steps.result.send_click_count = 1
-    steps.provider.analyze_screen.side_effect = [_sent_verify_call(False), _sent_verify_call(True)]
+    steps.vision.primary.analyze_screen.side_effect = [_sent_verify_call(False), _sent_verify_call(True)]
     captures = [_capture(filename="s1.png"), _capture(filename="s2.png")]
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.capture_screen", side_effect=captures), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -230,7 +231,7 @@ def test_verification_exhausts_click_count_stays_one_no_resend():
     steps = _ready_steps()
     steps.result.send_click_executed = True
     steps.result.send_click_count = 1
-    steps.provider.analyze_screen.side_effect = [_sent_verify_call(False), _sent_verify_call(False)]
+    steps.vision.primary.analyze_screen.side_effect = [_sent_verify_call(False), _sent_verify_call(False)]
     captures = [_capture(filename="s1.png"), _capture(filename="s2.png")]
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.capture_screen", side_effect=captures), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -248,7 +249,7 @@ def test_provider_failure_during_sent_verification_no_resend():
     steps = _ready_steps()
     steps.result.send_click_executed = True
     steps.result.send_click_count = 1
-    steps.provider.analyze_screen.side_effect = [VisionProviderError("timeout"), VisionProviderError("timeout")]
+    steps.vision.primary.analyze_screen.side_effect = [VisionProviderError("timeout"), VisionProviderError("timeout")]
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
         mock_pyautogui.FAILSAFE = True
@@ -262,7 +263,7 @@ def test_verification_retries_never_call_click_move_write_press():
     steps = _ready_steps()
     steps.result.send_click_executed = True
     steps.result.send_click_count = 1
-    steps.provider.analyze_screen.side_effect = [_sent_verify_call(False), _sent_verify_call(True)]
+    steps.vision.primary.analyze_screen.side_effect = [_sent_verify_call(False), _sent_verify_call(True)]
     captures = [_capture(filename="s1.png"), _capture(filename="s2.png")]
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.capture_screen", side_effect=captures), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:

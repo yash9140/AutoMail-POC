@@ -26,7 +26,6 @@ from pathlib import Path
 from typing import Optional
 
 import pyautogui
-from pydantic import ValidationError
 
 from app.automation.screen_capture import DEFAULT_OUTPUT_DIR, ScreenCaptureError, capture_screen
 from app.automation.scrolling import scroll_email_body
@@ -39,13 +38,13 @@ from app.config.settings import (
     REPLY_SEARCH_SCROLL_STABILIZE_WAIT_SECONDS,
     VISION_CONFIDENCE_THRESHOLD,
 )
-from app.fallback.recovery import call_with_provider_retry
 from app.metrics.step_metrics import estimate_cost
 from app.playbook.failure_reasons import LaunchFailureReason
 from app.safety.foreground import get_foreground_window_title, is_outlook_foreground
 from app.safety.validators import GroundingCheckFailure, validate_grounding
 from app.vision.grounding import normalize_1000_to_pixels
 from app.vision.models import ReplySearchResponse
+from app.vision.service import VisionRequest
 from rnd.models.click_execution import VerificationResponseV2
 from rnd.models.outlook_launch import CallMetrics
 from rnd.models.reply_draft import ReplyEditorVerificationAttempt
@@ -66,33 +65,32 @@ STAGE_REPLY_EDITOR_VERIFICATION = "REPLY_EDITOR_VERIFICATION"
 
 
 class ReplyDiscoverySteps:
-    """Mixin — expects self.result, self.provider, self.check_abort(),
+    """Mixin — expects self.result, self.vision, self.check_abort(),
     self._accumulate() from the composing class (app.outlook.draft.ReplyDraftSteps)."""
 
     def _check_reply_editor_open(self, image_path: Path) -> bool:
         prompt_text = STATE_CHECK_PROMPT_PATH.read_text(encoding="utf-8").format(
             action="(state check only, no action performed)", expected_state=REPLY_EDITOR_EXPECTED_STATE
         )
-        outcome = call_with_provider_retry(
-            lambda: self.provider.analyze_screen(image_path, "Check whether reply editor is open", prompt_text),
-            stage=STAGE_REPLY_EDITOR_VERIFICATION, provider_name=self.provider.provider_name,
-        )
-        self.result.provider_retries += outcome.retries_used
-        if outcome.result is None:
+        outcome = self.vision.analyze(VisionRequest(
+            stage=STAGE_REPLY_EDITOR_VERIFICATION, screenshot_path=image_path,
+            goal="Check whether reply editor is open", prompt_text=prompt_text,
+            response_model=VerificationResponseV2,
+        ))
+        self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+        self.result.fallback_uses += 1 if outcome.fallback_used else 0
+        if outcome.parsed is None:
             return False
-        call = outcome.result
+        call_metrics = outcome.call_metrics
         metrics = CallMetrics(
-            latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-            estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+            latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+            output_tokens=call_metrics.output_tokens,
+            estimated_cost=estimate_cost(
+                call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+            ),
         )
         self._accumulate(metrics, self.result.ground_reply_metrics)
-        if call.parsed_json is None:
-            return False
-        try:
-            structured = VerificationResponseV2.model_validate(call.parsed_json)
-        except ValidationError:
-            return False
-        return structured.verified
+        return outcome.parsed.verified
 
     def prepare_reply_editor(self) -> bool:
         if self.result.content_complete is not True:
@@ -154,34 +152,29 @@ class ReplyDiscoverySteps:
             prompt_text = REPLY_SEARCH_PROMPT_PATH.read_text(encoding="utf-8").format(
                 width=capture.width, height=capture.height,
             )
-            outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(Path(capture.path), "Locate the Reply control", prompt_text),
-                stage=STAGE_REPLY_SEARCH, provider_name=self.provider.provider_name,
-            )
-            self.result.provider_retries += outcome.retries_used
-            if outcome.result is None:
+            outcome = self.vision.analyze(VisionRequest(
+                stage=STAGE_REPLY_SEARCH, screenshot_path=Path(capture.path),
+                goal="Locate the Reply control", prompt_text=prompt_text, response_model=ReplySearchResponse,
+            ))
+            self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+            self.result.fallback_uses += 1 if outcome.fallback_used else 0
+            if outcome.parsed is None:
                 self.result.result = "ERROR"
                 self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
                 self.result.notes = outcome.error
                 return False
-            call = outcome.result
+            structured = outcome.parsed
+            call_metrics = outcome.call_metrics
 
             metrics = CallMetrics(
-                latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-                estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+                latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+                output_tokens=call_metrics.output_tokens,
+                estimated_cost=estimate_cost(
+                    call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+                ),
             )
             self._accumulate(metrics, self.result.ground_reply_metrics)
             self.result.reply_grounding_metrics = metrics
-
-            try:
-                structured = ReplySearchResponse.model_validate(call.parsed_json) if call.parsed_json else None
-            except ValidationError:
-                structured = None
-            if structured is None:
-                self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-                self.result.notes = "Reply-search response was not schema-valid."
-                return False
 
             identity = structured.control_identity.strip().lower()
             identity_ok = structured.reply_visible and identity == "reply"
@@ -337,38 +330,32 @@ class ReplyDiscoverySteps:
             prompt_text = STATE_CHECK_PROMPT_PATH.read_text(encoding="utf-8").format(
                 action="Clicked Reply (or editor was already open)", expected_state=REPLY_EDITOR_EXPECTED_STATE
             )
-            outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(Path(capture.path), "Verify the reply editor is open", prompt_text),
-                stage=STAGE_REPLY_EDITOR_VERIFICATION, provider_name=self.provider.provider_name,
-            )
-            self.result.provider_retries += outcome.retries_used
-            if outcome.result is None:
+            outcome = self.vision.analyze(VisionRequest(
+                stage=STAGE_REPLY_EDITOR_VERIFICATION, screenshot_path=Path(capture.path),
+                goal="Verify the reply editor is open", prompt_text=prompt_text,
+                response_model=VerificationResponseV2,
+            ))
+            self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+            self.result.fallback_uses += 1 if outcome.fallback_used else 0
+            if outcome.parsed is None:
                 attempt.error = outcome.error
                 self.result.reply_editor_verification_attempts.append(attempt)
                 self.result.result = "ERROR"
                 self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
                 self.result.notes = outcome.error
                 return False
-            call = outcome.result
+            structured = outcome.parsed
+            call_metrics = outcome.call_metrics
 
             metrics = CallMetrics(
-                latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-                estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+                latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+                output_tokens=call_metrics.output_tokens,
+                estimated_cost=estimate_cost(
+                    call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+                ),
             )
             self._accumulate(metrics, self.result.verify_reply_editor_metrics)
             attempt.metrics = metrics
-
-            try:
-                structured = VerificationResponseV2.model_validate(call.parsed_json) if call.parsed_json else None
-            except ValidationError:
-                structured = None
-            if structured is None:
-                attempt.error = "Response was not schema-valid."
-                self.result.reply_editor_verification_attempts.append(attempt)
-                self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-                self.result.notes = "Reply-editor-verification response was not schema-valid."
-                return False
 
             attempt.schema_valid = True
             attempt.verified = structured.verified

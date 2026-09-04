@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.safety.abort_controller import AbortController  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 from app.workers.outlook_launch_worker import OutlookLaunchWorker  # noqa: E402
 
 STEPS_MODULE = "app.outlook.launch"
@@ -64,7 +65,7 @@ def test_bounded_approval_granted_true_runs_end_to_end_to_success():
     titles = itertools.chain(["Search", "Search", "Search"], itertools.repeat("Inbox - Yash Dhanraj - Outlook"))
 
     mock_provider = _mock_provider_ctx()
-    with patch("app.workers.outlook_launch_worker._provider", return_value=(mock_provider, "gemini-3.6-flash")), \
+    with patch("app.workers.outlook_launch_worker._provider", return_value=(VisionService(mock_provider, fallback=None), "gemini-3.6-flash")), \
          patch(f"{STEPS_MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{STEPS_MODULE}.time.sleep"), \
          patch(f"{STEPS_MODULE}.get_foreground_window_title", side_effect=titles), \
@@ -95,7 +96,7 @@ def test_bounded_approval_granted_false_stops_before_click():
     worker.aborted.connect(lambda *a: signals["aborted"].append(a))
 
     mock_provider = _mock_provider_ctx()
-    with patch("app.workers.outlook_launch_worker._provider", return_value=(mock_provider, "gemini-3.6-flash")), \
+    with patch("app.workers.outlook_launch_worker._provider", return_value=(VisionService(mock_provider, fallback=None), "gemini-3.6-flash")), \
          patch(f"{STEPS_MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{STEPS_MODULE}.time.sleep"), \
          patch(f"{STEPS_MODULE}.get_foreground_window_title", return_value="Search"), \
@@ -128,7 +129,7 @@ def test_grounding_failure_stops_before_any_approval_is_even_considered():
     mock_provider = MagicMock()
     mock_provider.analyze_screen.return_value = no_result_response
 
-    with patch("app.workers.outlook_launch_worker._provider", return_value=(mock_provider, "gemini-3.6-flash")), \
+    with patch("app.workers.outlook_launch_worker._provider", return_value=(VisionService(mock_provider, fallback=None), "gemini-3.6-flash")), \
          patch(f"{STEPS_MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{STEPS_MODULE}.time.sleep"), \
          patch(f"{STEPS_MODULE}.get_foreground_window_title", return_value="Search"), \

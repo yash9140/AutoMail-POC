@@ -37,13 +37,14 @@ from app.outlook.launch import OutlookLaunchSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.providers.base import NetworkError  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 
 MODULE = "app.outlook.launch"
 _ENV_MATCH = {"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True}
 
 
 def _steps() -> OutlookLaunchSteps:
-    steps = OutlookLaunchSteps(AbortController(), MagicMock(), "claude-sonnet-5")
+    steps = OutlookLaunchSteps(AbortController(), VisionService(MagicMock(), fallback=None), "claude-sonnet-5")
     steps.result.screen_width, steps.result.screen_height = 1920, 1080
     return steps
 
@@ -83,12 +84,12 @@ def _ground(steps: OutlookLaunchSteps) -> bool:
 
 def test_A_tight_bbox_around_row_accepted_no_refine_needed():
     steps = _steps()
-    steps.provider.analyze_screen.return_value = _call(
+    steps.vision.primary.analyze_screen.return_value = _call(
         bbox=[300.0, 400.0, 360.0, 700.0], bbox_tightly_scoped=True,
     )
     assert _ground(steps) is True
     assert steps.result.refine_pass_used is False
-    assert steps.provider.analyze_screen.call_count == 1
+    assert steps.vision.primary.analyze_screen.call_count == 1
     assert steps.result.converted_x is not None
 
 
@@ -97,7 +98,7 @@ def test_A_tight_bbox_around_row_accepted_no_refine_needed():
 def test_B_header_only_bbox_rejected_when_refine_also_cannot_localize_row():
     steps = _steps()
     header_shaped_bbox = [100.0, 350.0, 200.0, 750.0]  # short band above where the row actually is
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _call(bbox=header_shaped_bbox, bbox_tightly_scoped=False),
         _refine_call(target_visible=False, bbox=None),  # second look still can't confidently localize the row
     ]
@@ -116,7 +117,7 @@ def test_C_header_plus_row_bbox_rejected_when_refine_cannot_tighten_it():
     row beneath it, not just the header alone)."""
     steps = _steps()
     combined_bbox = [100.0, 350.0, 360.0, 750.0]  # spans header AND the row below it
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _call(bbox=combined_bbox, bbox_tightly_scoped=False),
         _refine_call(target_visible=False, bbox=None),
     ]
@@ -128,7 +129,7 @@ def test_C_header_plus_row_bbox_accepted_after_successful_tightening():
     steps = _steps()
     combined_bbox = [100.0, 350.0, 360.0, 750.0]
     tight_bbox = [300.0, 400.0, 360.0, 700.0]
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _call(bbox=combined_bbox, bbox_tightly_scoped=False),
         _refine_call(target_visible=True, bbox=tight_bbox, confidence=0.92),
     ]
@@ -148,7 +149,7 @@ def test_D_right_side_preview_panel_bbox_rejected_via_tightness_check():
     mechanism used for the header case is what actually catches it."""
     steps = _steps()
     preview_panel_bbox = [200.0, 600.0, 700.0, 950.0]  # tall, right-hand region with multiple action rows
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _call(bbox=preview_panel_bbox, bbox_tightly_scoped=False),
         _refine_call(target_visible=False, bbox=None),
     ]
@@ -166,10 +167,10 @@ def test_E_whole_results_column_bbox_rejected_by_geometry_even_if_self_reported_
     ever needing a refine call."""
     steps = _steps()
     column_bbox = [20.0, 350.0, 990.0, 700.0]  # tall column, modest/plausible width
-    steps.provider.analyze_screen.return_value = _call(bbox=column_bbox, bbox_tightly_scoped=True)
+    steps.vision.primary.analyze_screen.return_value = _call(bbox=column_bbox, bbox_tightly_scoped=True)
     assert _ground(steps) is False
     assert steps.result.failure_reason == LaunchFailureReason.GROUNDING_INVALID
-    assert steps.provider.analyze_screen.call_count == 1  # geometry alone caught it — no refine call spent
+    assert steps.vision.primary.analyze_screen.call_count == 1  # geometry alone caught it — no refine call spent
 
 
 # --- F: correct row at different vertical positions — accepted, no hardcoded position ---
@@ -183,7 +184,7 @@ def test_F_correct_row_at_different_vertical_positions_all_accepted():
     seen_click_points = set()
     for bbox in positions:
         steps = _steps()
-        steps.provider.analyze_screen.return_value = _call(bbox=bbox, bbox_tightly_scoped=True)
+        steps.vision.primary.analyze_screen.return_value = _call(bbox=bbox, bbox_tightly_scoped=True)
         assert _ground(steps) is True, bbox
         seen_click_points.add((steps.result.converted_x, steps.result.converted_y))
     assert len(seen_click_points) == 3  # no fixed/hardcoded click point
@@ -193,14 +194,14 @@ def test_F_correct_row_at_different_vertical_positions_all_accepted():
 
 def test_sublabel_reported_but_not_app_like_rejected():
     steps = _steps()
-    steps.provider.analyze_screen.return_value = _call(visible_sublabel="Web result")
+    steps.vision.primary.analyze_screen.return_value = _call(visible_sublabel="Web result")
     assert _ground(steps) is False
     assert steps.result.failure_reason == LaunchFailureReason.OUTLOOK_RESULT_SUBLABEL_MISMATCH
 
 
 def test_sublabel_empty_is_not_disqualifying_alone():
     steps = _steps()
-    steps.provider.analyze_screen.return_value = _call(visible_sublabel="")
+    steps.vision.primary.analyze_screen.return_value = _call(visible_sublabel="")
     assert _ground(steps) is True
 
 
@@ -209,11 +210,11 @@ def test_sublabel_empty_is_not_disqualifying_alone():
 def test_refine_call_transient_error_retries_refine_only_no_duplicate_first_pass():
     steps = _steps()
     tight_bbox = [300.0, 400.0, 360.0, 700.0]
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _call(bbox=[100.0, 350.0, 360.0, 750.0], bbox_tightly_scoped=False),
         NetworkError("[Errno 10054] connection reset"),  # refine call transient failure
         _refine_call(target_visible=True, bbox=tight_bbox, confidence=0.9),  # refine retry succeeds
     ]
     assert _ground(steps) is True
-    assert steps.provider.analyze_screen.call_count == 3  # first pass + 2 refine attempts, never a 4th
+    assert steps.vision.primary.analyze_screen.call_count == 3  # first pass + 2 refine attempts, never a 4th
     assert steps.result.provider_retries == 1

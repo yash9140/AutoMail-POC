@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Optional
 
 import pyautogui
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -50,7 +50,6 @@ from app.config.settings import (  # noqa: E402
     POST_CLICK_RETRY_WAIT_SECONDS,
     VISION_CONFIDENCE_THRESHOLD,
 )
-from app.fallback.recovery import call_with_provider_retry  # noqa: E402
 from app.metrics.step_metrics import estimate_cost  # noqa: E402
 from app.outlook.launch import OutlookLaunchSteps, _provider  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
@@ -60,7 +59,7 @@ from app.safety.validators import GroundingCheckFailure, validate_grounding  # n
 from app.vision.debug_overlay import save_grounding_debug_artifact  # noqa: E402
 from app.vision.grounding import normalize_1000_to_pixels  # noqa: E402
 from app.vision.models import EmailCandidate, EmailSearchResponse  # noqa: E402
-from app.vision.providers.base import VisionProvider  # noqa: E402
+from app.vision.service import VisionRequest, VisionService  # noqa: E402
 from rnd.models.find_open_email import (  # noqa: E402
     EmailOpenVerificationAttempt,
     EmailOpenVerificationResponse,
@@ -338,6 +337,7 @@ class FindEmailResult(RND009CResult):
     outlook_ready_at: Optional[str] = None
     outlook_ready_ms: Optional[float] = None
     provider_retries: int = 0
+    fallback_uses: int = 0
 
     # --- Phase 3: find email ---
     find_email_started_at: Optional[str] = None
@@ -360,7 +360,7 @@ class FindOpenEmailSteps:
     def __init__(
         self,
         abort_controller: AbortController,
-        provider: VisionProvider,
+        vision: VisionService,
         model: str,
         target_sender: str = TARGET_EMAIL_SENDER,
         target_subject: str = TARGET_EMAIL_SUBJECT,
@@ -368,10 +368,10 @@ class FindOpenEmailSteps:
         if not target_sender or not target_sender.strip():
             raise ValueError("target_sender is required and must be non-empty.")
         self.abort_controller = abort_controller
-        self.provider = provider
+        self.vision = vision
         self.model = model
         self.result = FindEmailResult(target_subject=target_subject or "", target_sender=target_sender)
-        self.launch = OutlookLaunchSteps(abort_controller, provider, model)
+        self.launch = OutlookLaunchSteps(abort_controller, vision, model)
         self._session_start_monotonic: Optional[float] = None
         self._find_start_monotonic: Optional[float] = None
 
@@ -460,6 +460,7 @@ class FindOpenEmailSteps:
         r.outlook_ready_at = lr.outlook_ready_at
         r.outlook_ready_ms = lr.outlook_ready_ms
         r.provider_retries += lr.provider_retries
+        r.fallback_uses += lr.fallback_uses
 
         r.launch_outlook_metrics = StepMetrics(
             vision_calls=1 if lr.grounding_metrics.input_tokens else 0,
@@ -518,34 +519,30 @@ class FindOpenEmailSteps:
                 width=capture.width, height=capture.height,
                 target_sender=self.result.target_sender, target_subject_clause=subject_clause,
             )
-            outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(Path(capture.path), "Search for the target email", prompt_text),
-                stage=STAGE_TARGET_EMAIL_SEARCH, provider_name=self.provider.provider_name,
-            )
-            self.result.provider_retries += outcome.retries_used
-            if outcome.result is None:
+            outcome = self.vision.analyze(VisionRequest(
+                stage=STAGE_TARGET_EMAIL_SEARCH, screenshot_path=Path(capture.path),
+                goal="Search for the target email", prompt_text=prompt_text,
+                response_model=EmailSearchResponse,
+            ))
+            self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+            self.result.fallback_uses += 1 if outcome.fallback_used else 0
+            if outcome.parsed is None:
                 self.result.result = "ERROR"
                 self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
                 self.result.notes = outcome.error
                 return False
-            call = outcome.result
+            structured = outcome.parsed
+            call_metrics = outcome.call_metrics
 
             metrics = CallMetrics(
-                latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-                estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+                latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+                output_tokens=call_metrics.output_tokens,
+                estimated_cost=estimate_cost(
+                    call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+                ),
             )
             self._accumulate(metrics, self.result.find_email_metrics)
             self.result.email_grounding_metrics = metrics
-
-            try:
-                structured = EmailSearchResponse.model_validate(call.parsed_json) if call.parsed_json else None
-            except ValidationError:
-                structured = None
-            if structured is None:
-                self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-                self.result.notes = "Email-search response was not schema-valid."
-                return False
 
             self.result.email_search_response = structured
 
@@ -785,39 +782,32 @@ class FindOpenEmailSteps:
             prompt_text = EMAIL_OPEN_VERIFICATION_PROMPT_PATH.read_text(encoding="utf-8").format(
                 target_sender=self.result.target_sender, target_subject_clause=subject_clause,
             )
-            outcome = call_with_provider_retry(
-                lambda: self.provider.analyze_screen(Path(capture.path), "Verify the correct email opened", prompt_text),
-                stage=STAGE_EMAIL_OPEN_VERIFICATION, provider_name=self.provider.provider_name,
-            )
-            self.result.provider_retries += outcome.retries_used
-            if outcome.result is None:
+            outcome = self.vision.analyze(VisionRequest(
+                stage=STAGE_EMAIL_OPEN_VERIFICATION, screenshot_path=Path(capture.path),
+                goal="Verify the correct email opened", prompt_text=prompt_text,
+                response_model=EmailOpenVerificationResponse,
+            ))
+            self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
+            self.result.fallback_uses += 1 if outcome.fallback_used else 0
+            if outcome.parsed is None:
                 attempt.error = outcome.error
                 self.result.email_open_verification_attempts.append(attempt)
                 self.result.result = "ERROR"
                 self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
                 self.result.notes = outcome.error
                 return False
-            call = outcome.result
+            structured = outcome.parsed
+            call_metrics = outcome.call_metrics
 
             metrics = CallMetrics(
-                latency_ms=call.latency_ms, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
-                estimated_cost=estimate_cost(self.provider.provider_name, call.model, call.input_tokens, call.output_tokens),
+                latency_ms=call_metrics.latency_ms, input_tokens=call_metrics.input_tokens,
+                output_tokens=call_metrics.output_tokens,
+                estimated_cost=estimate_cost(
+                    call_metrics.provider_name, call_metrics.model, call_metrics.input_tokens, call_metrics.output_tokens,
+                ),
             )
             self._accumulate(metrics, self.result.verify_email_opened_metrics)
             attempt.metrics = metrics
-
-            try:
-                structured = EmailOpenVerificationResponse.model_validate(call.parsed_json) if call.parsed_json else None
-            except ValidationError:
-                structured = None
-
-            if structured is None:
-                attempt.error = "Response was not schema-valid."
-                self.result.email_open_verification_attempts.append(attempt)
-                self.result.result = "ERROR"
-                self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
-                self.result.notes = "Email-open-verification response was not schema-valid."
-                return False
 
             attempt.schema_valid = True
             attempt.email_open = structured.email_open

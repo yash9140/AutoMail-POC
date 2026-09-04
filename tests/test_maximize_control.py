@@ -16,12 +16,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.outlook.launch import OutlookLaunchSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 
 MODULE = "app.outlook.launch"
 
 
 def _steps() -> OutlookLaunchSteps:
-    return OutlookLaunchSteps(AbortController(), MagicMock(), "gemini-3.6-flash")
+    return OutlookLaunchSteps(AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash")
 
 
 def _capture(width=1920, height=1080, filename="post_max.png"):
@@ -144,7 +145,7 @@ def test_splash_screen_after_maximize_does_not_reach_ready():
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.enforce_maximized() is True
 
-    steps.provider.analyze_screen.return_value = _readiness_call(outlook_visible=True, splash=True, ready=False)
+    steps.vision.primary.analyze_screen.return_value = _readiness_call(outlook_visible=True, splash=True, ready=False)
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_outlook_readiness() is False
@@ -165,7 +166,7 @@ def test_fully_loaded_outlook_after_maximize_reaches_ready():
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.enforce_maximized() is True
 
-    steps.provider.analyze_screen.return_value = _readiness_call(outlook_visible=True, splash=False, ready=True)
+    steps.vision.primary.analyze_screen.return_value = _readiness_call(outlook_visible=True, splash=False, ready=True)
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_outlook_readiness() is True
@@ -190,7 +191,7 @@ def test_readiness_retry_does_not_relaunch_or_remaximize():
 
     still_loading = _readiness_call(outlook_visible=True, splash=True, ready=False)
     now_ready = _readiness_call(outlook_visible=True, splash=False, ready=True)
-    steps.provider.analyze_screen.side_effect = [still_loading, now_ready]
+    steps.vision.primary.analyze_screen.side_effect = [still_loading, now_ready]
 
     with patch(f"{MODULE}.pyautogui") as mock_pyautogui, patch(f"{MODULE}.time.sleep"), \
          patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
@@ -209,7 +210,7 @@ def test_readiness_retry_does_not_relaunch_or_remaximize():
 def test_readiness_timeout_is_a_safe_failure():
     steps = _steps()
     steps.result.foreground_verified = True
-    steps.provider.analyze_screen.return_value = _readiness_call(outlook_visible=True, splash=True, ready=False)
+    steps.vision.primary.analyze_screen.return_value = _readiness_call(outlook_visible=True, splash=True, ready=False)
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_outlook_readiness() is False
@@ -226,7 +227,7 @@ def test_provider_error_during_readiness_classified_as_technical_not_semantic():
 
     steps = _steps()
     steps.result.foreground_verified = True
-    steps.provider.analyze_screen.side_effect = RateLimitError("HTTP 429: rate limited")
+    steps.vision.primary.analyze_screen.side_effect = RateLimitError("HTTP 429: rate limited")
 
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):
@@ -257,7 +258,7 @@ def test_provider_retried_once_before_classified_as_error():
     steps = _steps()
     steps.result.foreground_verified = True
     ready_response = _readiness_call()
-    steps.provider.analyze_screen.side_effect = [ProviderTimeoutError("timed out"), ready_response]
+    steps.vision.primary.analyze_screen.side_effect = [ProviderTimeoutError("timed out"), ready_response]
 
     with patch(f"{MODULE}.time.sleep"), patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()):

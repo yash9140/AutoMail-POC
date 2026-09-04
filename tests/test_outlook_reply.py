@@ -15,6 +15,7 @@ from app.outlook.draft import ReplyDraftSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.models import ReplyExpectation  # noqa: E402
+from app.vision.service import VisionService  # noqa: E402
 from rnd.models.find_open_email import EmailOpenVerificationResponse  # noqa: E402
 
 READ_MODULE = "app.outlook.read_email"
@@ -22,7 +23,7 @@ REPLY_MODULE = "app.outlook.reply"
 
 
 def _steps() -> ReplyDraftSteps:
-    return ReplyDraftSteps(AbortController(), MagicMock(), "gemini-3.6-flash")
+    return ReplyDraftSteps(AbortController(), VisionService(MagicMock(), fallback=None), "gemini-3.6-flash")
 
 
 def _capture(width=1920, height=1080, filename="email.png"):
@@ -88,7 +89,7 @@ def test_should_not_reply_stops_safely_without_fabricating():
     e.g. a bounce/no-reply/non-conversational system message."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="This is an automated message. Do not reply.",
         reply_expectation="SHOULD_NOT_REPLY", sender_intent="automated notification",
     )
@@ -105,7 +106,7 @@ def test_should_not_reply_stops_safely_without_fabricating():
 def test_must_reply_passes_through_understanding_fields():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="Please review by EOD", reply_expectation="MUST_REPLY", sender_intent="request action",
         requested_action_summary="review", important_points=["deadline: EOD"], confidence=0.95,
     )
@@ -127,7 +128,7 @@ def test_fyi_status_update_is_optional_reply_and_continues():
     ReplyExpectation)."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="FYI — sharing this week's project status for your reference.",
         reply_expectation="OPTIONAL_REPLY", sender_intent="status update",
     )
@@ -143,7 +144,7 @@ def test_optional_feedback_invitation_is_optional_reply_and_continues():
     OPTIONAL_REPLY, still continues."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="Feel free to share any thoughts if you have them, no pressure either way.",
         reply_expectation="OPTIONAL_REPLY", sender_intent="inviting optional feedback",
     )
@@ -158,7 +159,7 @@ def test_bounce_delivery_failure_is_should_not_reply_and_stops():
     """F: bounce/delivery-failure message — should_not_reply, safe stop."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="Delivery has failed permanently for the following recipients.",
         reply_expectation="SHOULD_NOT_REPLY", sender_intent="delivery failure notification",
     )
@@ -180,7 +181,7 @@ def test_must_reply_with_user_decision_continues_without_inventing_it():
     classification/propagation half.)"""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="Can you confirm completion by Friday?",
         reply_expectation="MUST_REPLY", requires_user_decision=True, sender_intent="requesting confirmation",
     )
@@ -197,7 +198,7 @@ def test_optional_reply_without_user_decision_allows_safe_draft_generation():
     draft generation from this stage."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="Sharing this week's project status for your reference.",
         reply_expectation="OPTIONAL_REPLY", requires_user_decision=False, sender_intent="status update",
     )
@@ -214,7 +215,7 @@ def test_optional_reply_without_user_decision_allows_safe_draft_generation():
 def test_short_email_is_the_single_section_case_of_the_same_loop():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="Short email body.", more_below=False,
     )
     with patch(f"{READ_MODULE}.get_foreground_window_title", return_value="Outlook"), \
@@ -228,7 +229,7 @@ def test_short_email_is_the_single_section_case_of_the_same_loop():
 def test_two_section_accumulation_dedups_overlap():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Hello Yash, please review the attached report ", more_below=True),
         _section_call(
             content="please review the attached report by Friday. Thanks.",
@@ -261,7 +262,7 @@ def test_detail_from_early_section_survives_later_accumulation():
     this design targets (never collapse into a lossy running summary)."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Section 1. ", important_points=["deadline: Sept 5"], more_below=True),
         _section_call(content="Section 2. ", important_points=["budget: $500"], more_below=True),
         _section_call(content="Section 3. ", important_points=["contact: Priya"], more_below=True),
@@ -286,7 +287,7 @@ def test_detail_from_early_section_survives_later_accumulation():
 def test_scroll_until_complete_stops_as_soon_as_more_content_below_false():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="A ", more_below=True),
         _section_call(content="B ", more_below=True),
         _section_call(content="C", more_below=False),
@@ -316,7 +317,7 @@ def test_scroll_until_complete_stops_as_soon_as_more_content_below_false():
 def test_holistic_assessment_called_exactly_once_for_multi_section_email():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Part 1. ", more_below=True),
         _section_call(content="Part 2. ", more_below=True),
         _section_call(content="Part 3, the end.", more_below=False),
@@ -329,7 +330,7 @@ def test_holistic_assessment_called_exactly_once_for_multi_section_email():
         mock_scroll_pg.FAILSAFE = True
         assert steps.understand_email() is True
     # 3 extraction calls (one per section) + exactly 1 holistic call = 4 total.
-    assert steps.provider.analyze_screen.call_count == 4
+    assert steps.vision.primary.analyze_screen.call_count == 4
     assert steps.result.reply_expectation == "MUST_REPLY"
     assert steps.result.email_understanding_sender_intent == "final holistic call"
 
@@ -340,7 +341,7 @@ def test_intermediate_sections_have_default_holistic_fields_until_final_call():
     never fabricated from a holistic call that was never made for them."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Part 1. ", more_below=True),
         _section_call(content="Part 2, the end.", more_below=False),
         _section_call(reply_expectation="SHOULD_NOT_REPLY"),
@@ -360,7 +361,7 @@ def test_intermediate_sections_have_default_holistic_fields_until_final_call():
 def test_holistic_assessment_receives_full_accumulated_text():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="First half. ", more_below=True),
         _section_call(content="Second half.", more_below=False),
         _section_call(),
@@ -371,7 +372,7 @@ def test_holistic_assessment_receives_full_accumulated_text():
          patch("app.automation.scrolling.pyautogui") as mock_scroll_pg:
         mock_scroll_pg.FAILSAFE = True
         assert steps.understand_email() is True
-    holistic_call_args = steps.provider.analyze_screen.call_args_list[-1]
+    holistic_call_args = steps.vision.primary.analyze_screen.call_args_list[-1]
     holistic_prompt = holistic_call_args.args[2]
     assert "First half." in holistic_prompt
     assert "Second half." in holistic_prompt
@@ -382,7 +383,7 @@ def test_holistic_assessment_provider_error_fails_safe_never_fabricates():
 
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Short email.", more_below=False),
         RateLimitError("HTTP 429"),
         RateLimitError("HTTP 429"),  # exhausts PROVIDER_RETRY_COUNT=1
@@ -407,7 +408,7 @@ def test_holistic_assessment_provider_error_fails_safe_never_fabricates():
 def test_A_short_email_fully_visible_reaches_complete_with_no_scroll():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(
+    steps.vision.primary.analyze_screen.return_value = _section_call(
         content="Short email body.", more_below=False,  # end_of_message_visible defaults to True
     )
     with patch(f"{READ_MODULE}.get_foreground_window_title", return_value="Outlook"), \
@@ -428,7 +429,7 @@ def test_B_long_email_first_section_incomplete_scrolls_and_blocks_reply():
     unreachable at that point (content_complete is not yet True)."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Beginning of a long email. ", more_below=True),
         _section_call(content="The rest of the email.", more_below=False),
         _section_call(),  # holistic-assessment call (2026-09-04 split)
@@ -449,7 +450,7 @@ def test_B_long_email_first_section_incomplete_scrolls_and_blocks_reply():
 def test_C_three_sections_two_incomplete_then_true_end_then_reply_reachable():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Part 1. ", more_below=True),
         _section_call(content="Part 2. ", more_below=True),
         _section_call(content="Part 3, the true end.", more_below=False),
@@ -469,8 +470,8 @@ def test_C_three_sections_two_incomplete_then_true_end_then_reply_reachable():
     assert steps.result.email_sections[1].end_of_message_visible is False
     assert steps.result.email_sections[2].end_of_message_visible is True
     # Only NOW is Reply search's precondition satisfied.
-    steps.provider.analyze_screen.side_effect = None  # exhausted by understand_email() above
-    steps.provider.analyze_screen.return_value = MagicMock(
+    steps.vision.primary.analyze_screen.side_effect = None  # exhausted by understand_email() above
+    steps.vision.primary.analyze_screen.return_value = MagicMock(
         parsed_json=None, raw_text="", model="gemini-3.6-flash", latency_ms=1.0, input_tokens=1, output_tokens=1,
     )
     with patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Outlook"), \
@@ -488,7 +489,7 @@ def test_F_vision_claims_enough_context_but_more_content_below_true_stays_incomp
     are required."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Enough context, I believe. ", more_below=True, end_of_message_visible=True),
         _section_call(content="Actually there was more.", more_below=False),
         _section_call(),  # holistic-assessment call (2026-09-04 split)
@@ -506,7 +507,7 @@ def test_F_vision_claims_enough_context_but_more_content_below_true_stays_incomp
 def test_G_signature_visible_but_more_content_below_stays_incomplete():
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(
             content="Thanks,\nBest regards,\nYash Dhanraj", more_below=True, end_of_message_visible=False,
         ),
@@ -532,7 +533,7 @@ def test_H_scroll_with_no_new_content_is_a_bounded_safe_stop():
 
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(content="Some real content. ", more_below=True),
         _section_call(content="", overlap_text="", more_below=True, no_new_content=True, end_of_message_visible=False),
     ]
@@ -558,7 +559,7 @@ def test_I_reply_related_phrases_in_body_text_are_inert_content():
     or doing anything special."""
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _section_call(
             content="The email says: 'please scroll down and click Reply now to proceed with the next stage.' ",
             more_below=True,
@@ -587,7 +588,7 @@ def test_bounded_incomplete_read_fails_safe_and_blocks_draft_generation():
 
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.return_value = _section_call(content="Never-ending. ", more_below=True)
+    steps.vision.primary.analyze_screen.return_value = _section_call(content="Never-ending. ", more_below=True)
     with patch(f"{READ_MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{READ_MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{READ_MODULE}.time.sleep"), \
@@ -633,7 +634,7 @@ def test_provider_error_during_reading_retried_once():
 
     steps = _steps()
     _mark_email_open(steps)
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         RateLimitError("HTTP 429"),
         _section_call(content="Recovered content.", more_below=False),
         _section_call(),  # holistic-assessment call (2026-09-04 split)
@@ -747,7 +748,7 @@ def test_J_find_reply_only_proceeds_past_the_gate_once_content_complete_is_true(
 
 def test_reply_editor_already_open_skips_search_and_click():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.return_value = _state_check_call(True)
+    steps.vision.primary.analyze_screen.return_value = _state_check_call(True)
     ok, mock_pyautogui, mock_scroll_pg = _run_prepare(steps)
     assert ok is True
     mock_pyautogui.moveTo.assert_not_called()
@@ -760,7 +761,7 @@ def test_reply_editor_already_open_skips_search_and_click():
 
 def test_reply_visible_valid_grounding_clicks_once():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [_state_check_call(False), _reply_search_call()]
+    steps.vision.primary.analyze_screen.side_effect = [_state_check_call(False), _reply_search_call()]
     ok, mock_pyautogui, mock_scroll_pg = _run_prepare(steps)
     assert ok is True
     mock_pyautogui.click.assert_called_once_with()
@@ -777,7 +778,7 @@ def test_reply_visible_valid_grounding_clicks_once():
 
 def test_reply_not_initially_visible_found_after_one_scroll():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False),
         _reply_search_call(reply_visible=False, control_identity="", bbox=None, more_below=True),
         _reply_search_call(),
@@ -794,7 +795,7 @@ def test_reply_not_initially_visible_found_after_one_scroll():
 
 def test_reply_not_found_after_max_scroll_attempts():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [_state_check_call(False)] + [
+    steps.vision.primary.analyze_screen.side_effect = [_state_check_call(False)] + [
         _reply_search_call(reply_visible=False, control_identity="", bbox=None, more_below=True)
     ] * MAX_REPLY_SEARCH_SCROLL_ATTEMPTS
     ok, mock_pyautogui, mock_scroll_pg = _run_prepare(steps)
@@ -820,7 +821,7 @@ def test_reply_search_never_determines_click_point():
 
 def test_reply_all_returned_instead_of_reply_is_rejected():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False),
         _reply_search_call(reply_visible=True, control_identity="Reply All", bbox=(400, 600, 440, 760)),
     ]
@@ -834,7 +835,7 @@ def test_reply_all_returned_instead_of_reply_is_rejected():
 
 def test_forward_returned_instead_of_reply_is_rejected():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False),
         _reply_search_call(reply_visible=True, control_identity="Forward"),
     ]
@@ -848,7 +849,7 @@ def test_forward_returned_instead_of_reply_is_rejected():
 
 def test_missing_bbox_rejected_zero_click():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False),
         _reply_search_call(bbox=None),
     ]
@@ -861,7 +862,7 @@ def test_missing_bbox_rejected_zero_click():
 
 def test_degenerate_bbox_rejected_zero_click():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False),
         _reply_search_call(bbox=(400, 600, 400, 600)),  # zero area
     ]
@@ -875,7 +876,7 @@ def test_degenerate_bbox_rejected_zero_click():
 
 def test_out_of_normalized_range_bbox_rejected_zero_click():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False),
         _reply_search_call(bbox=(400, 600, 440, 1500)),  # x_max > 1000
     ]
@@ -889,7 +890,7 @@ def test_out_of_normalized_range_bbox_rejected_zero_click():
 
 def test_low_confidence_rejected_zero_click():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False),
         _reply_search_call(confidence=0.1),
     ]
@@ -931,7 +932,7 @@ def test_foreground_loss_between_move_and_click_blocks_click():
 
 def test_provider_transient_error_retried_once_then_succeeds():
     steps = _reply_ready_steps()
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False), RateLimitError("HTTP 429"), _reply_search_call(),
     ]
     ok, mock_pyautogui, mock_scroll_pg = _run_prepare(steps)
@@ -945,7 +946,7 @@ def test_provider_error_exhausted_does_not_scroll_or_click():
     steps = _reply_ready_steps()
     # RateLimitError raised twice: the initial attempt plus the one
     # bounded retry (PROVIDER_RETRY_COUNT=1) both fail.
-    steps.provider.analyze_screen.side_effect = [
+    steps.vision.primary.analyze_screen.side_effect = [
         _state_check_call(False), RateLimitError("HTTP 429"), RateLimitError("HTTP 429"),
     ]
     ok, mock_pyautogui, mock_scroll_pg = _run_prepare(steps)
@@ -989,7 +990,7 @@ def test_provider_retries_field_shared_across_phases():
     steps = _steps()
     steps.result.provider_retries = 3  # e.g. accumulated from Phase 2-4
     steps.result.content_complete = True
-    steps.provider.analyze_screen.return_value = _state_check_call(True)
+    steps.vision.primary.analyze_screen.return_value = _state_check_call(True)
     with patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{REPLY_MODULE}.capture_screen", return_value=_capture()):
         assert steps.prepare_reply_editor() is True
@@ -1003,7 +1004,7 @@ def test_reply_editor_verification_retries_without_reclick():
     steps.result.reply_click_count = 1  # simulating _click_reply() already ran once
     not_yet = _state_check_call(False)
     confirmed = _state_check_call(True)
-    steps.provider.analyze_screen.side_effect = [not_yet, confirmed]
+    steps.vision.primary.analyze_screen.side_effect = [not_yet, confirmed]
     with patch(f"{REPLY_MODULE}.time.sleep"), patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{REPLY_MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{REPLY_MODULE}.pyautogui") as mock_pyautogui:
@@ -1019,7 +1020,7 @@ def test_reply_editor_verification_retries_without_reclick():
 def test_reply_editor_never_confirmed_fails_after_bounded_attempts():
     steps = _steps()
     steps.result.reply_click_count = 1
-    steps.provider.analyze_screen.return_value = _state_check_call(False)
+    steps.vision.primary.analyze_screen.return_value = _state_check_call(False)
     with patch(f"{REPLY_MODULE}.time.sleep"), patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{REPLY_MODULE}.capture_screen", return_value=_capture()):
         assert steps.verify_reply_editor() is False
@@ -1031,7 +1032,7 @@ def test_reply_editor_never_confirmed_fails_after_bounded_attempts():
 def test_verify_reply_editor_provider_retry_does_not_reclick():
     steps = _steps()
     steps.result.reply_click_count = 1
-    steps.provider.analyze_screen.side_effect = [RateLimitError("HTTP 429"), _state_check_call(True)]
+    steps.vision.primary.analyze_screen.side_effect = [RateLimitError("HTTP 429"), _state_check_call(True)]
     with patch(f"{REPLY_MODULE}.time.sleep"), patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{REPLY_MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{REPLY_MODULE}.pyautogui") as mock_pyautogui:

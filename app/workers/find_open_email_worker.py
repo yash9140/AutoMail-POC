@@ -39,12 +39,12 @@ class FindOpenEmailWorker(QObject):
         self.safety_status.emit("Armed")
 
         try:
-            provider, model = _provider()
+            vision, model = _provider()
         except SystemExit as exc:
             self.failure.emit(LaunchFailureReason.TECHNICAL_PROVIDER_ERROR, str(exc))
             return
 
-        steps = FindOpenEmailSteps(self.abort_controller, provider, model)
+        steps = FindOpenEmailSteps(self.abort_controller, vision, model)
 
         if not self.bounded_approval_granted:
             self.log_message.emit("Bounded approval was not granted for this session.")
