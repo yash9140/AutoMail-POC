@@ -1,0 +1,143 @@
+{
+  "source_screenshot": "D:\\AutoLook-POC\\outlook-vision-poc\\screenshots\\raw\\screen_20260906_192232_725.png",
+  "trials": [
+    {
+      "trial": 1,
+      "stage1_bbox_full_px": [
+        1028.2,
+        819.3,
+        1080.0,
+        1296.0
+      ],
+      "stage1_usable": true,
+      "dynamic_crop_bounds": [
+        748,
+        950,
+        1368,
+        1080
+      ],
+      "stage2_send_visible": true,
+      "stage2_control_identity": "Send",
+      "stage2_semantic_correct": true,
+      "remapped_bbox_full_screen_norm": [
+        957.6296296296296,
+        403.1458333333333,
+        982.1851851851851,
+        454.1666666666667
+      ],
+      "stage2_bbox_correct": true,
+      "total_latency_ms": 7314.7
+    },
+    {
+      "trial": 2,
+      "stage1_bbox_full_px": [
+        1031.4,
+        819.3,
+        1085.4,
+        1445.8
+      ],
+      "stage1_usable": true,
+      "dynamic_crop_bounds": [
+        725,
+        950,
+        1540,
+        1080
+      ],
+      "stage2_send_visible": true,
+      "stage2_control_identity": "Send",
+      "stage2_semantic_correct": true,
+      "remapped_bbox_full_screen_norm": [
+        951.8518518518518,
+        403.921875,
+        985.5555555555557,
+        459.1041666666667
+      ],
+      "stage2_bbox_correct": true,
+      "total_latency_ms": 6757.2
+    },
+    {
+      "trial": 3,
+      "stage1_bbox_full_px": [
+        1028.2,
+        819.3,
+        1080.0,
+        1545.6
+      ],
+      "stage1_usable": true,
+      "dynamic_crop_bounds": [
+        710,
+        950,
+        1655,
+        1080
+      ],
+      "stage2_send_visible": true,
+      "stage2_control_identity": "Send",
+      "stage2_semantic_correct": true,
+      "remapped_bbox_full_screen_norm": [
+        887.8148148148148,
+        410.1510416666667,
+        892.6296296296296,
+        464.2916666666667
+      ],
+      "stage2_bbox_correct": false,
+      "total_latency_ms": 7439.1
+    },
+    {
+      "trial": 4,
+      "stage1_bbox_full_px": [
+        1028.2,
+        819.3,
+        1080.0,
+        1171.2
+      ],
+      "stage1_usable": true,
+      "dynamic_crop_bounds": [
+        766,
+        950,
+        1224,
+        1080
+      ],
+      "stage2_send_visible": true,
+      "stage2_control_identity": "Send",
+      "stage2_semantic_correct": true,
+      "remapped_bbox_full_screen_norm": [
+        966.6574074074075,
+        408.9770833333333,
+        990.7314814814815,
+        460.5020833333333
+      ],
+      "stage2_bbox_correct": true,
+      "total_latency_ms": 6830.1
+    },
+    {
+      "trial": 5,
+      "stage1_bbox_full_px": [
+        1029.2,
+        819.3,
+        1080.0,
+        1208.6
+      ],
+      "stage1_usable": true,
+      "dynamic_crop_bounds": [
+        761,
+        953,
+        1267,
+        1080
+      ],
+      "stage2_send_visible": true,
+      "stage2_control_identity": "Send",
+      "stage2_semantic_correct": true,
+      "remapped_bbox_full_screen_norm": [
+        948.1416666666667,
+        403.73333333333335,
+        980.4796296296296,
+        441.94687500000003
+      ],
+      "stage2_bbox_correct": true,
+      "total_latency_ms": 8042.2
+    }
+  ],
+  "stage1_usable": "5/5",
+  "stage2_semantic_correct": "5/5",
+  "stage2_bbox_correct": "4/5"
+}

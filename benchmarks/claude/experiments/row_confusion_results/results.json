@@ -1,0 +1,463 @@
+{
+  "summary": {
+    "FULL_SCREEN": {
+      "correct_target_row": "5/5",
+      "avg_latency_ms": 8800.4,
+      "matching_row_indices_across_trials": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "grounding_stable": true
+    },
+    "MESSAGE_LIST_CROP": {
+      "correct_target_row": "5/5",
+      "avg_latency_ms": 6886.6,
+      "matching_row_indices_across_trials": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "grounding_stable": true
+    },
+    "TARGET_NEIGHBORHOOD_CROP": {
+      "correct_target_row": "5/5",
+      "avg_latency_ms": 4407.0,
+      "matching_row_indices_across_trials": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "grounding_stable": true
+    }
+  },
+  "trials": {
+    "FULL_SCREEN": [
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          374.0,
+          253.0,
+          462.0,
+          572.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 9052.6,
+        "response_char_count": 894,
+        "full_screen_bbox": [
+          374.0,
+          253.0,
+          462.0,
+          572.0
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          374.0,
+          252.0,
+          462.0,
+          572.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 9032.5,
+        "response_char_count": 894,
+        "full_screen_bbox": [
+          374.0,
+          252.0,
+          462.0,
+          572.0
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          374.0,
+          253.0,
+          462.0,
+          578.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 7510.8,
+        "response_char_count": 894,
+        "full_screen_bbox": [
+          374.0,
+          253.0,
+          462.0,
+          578.0
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          374.0,
+          252.0,
+          462.0,
+          572.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 8639.5,
+        "response_char_count": 894,
+        "full_screen_bbox": [
+          374.0,
+          252.0,
+          462.0,
+          572.0
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          373.0,
+          253.0,
+          460.0,
+          575.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 9766.7,
+        "response_char_count": 894,
+        "full_screen_bbox": [
+          373.0,
+          253.0,
+          460.0,
+          575.0
+        ]
+      }
+    ],
+    "MESSAGE_LIST_CROP": [
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          493.0,
+          42.0,
+          600.0,
+          430.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 8939.0,
+        "response_char_count": 891,
+        "full_screen_bbox": [
+          492.99999999999994,
+          185.76041666666669,
+          600.0,
+          333.28125
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          492.0,
+          42.0,
+          600.0,
+          430.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 6185.1,
+        "response_char_count": 890,
+        "full_screen_bbox": [
+          492.0,
+          185.76041666666669,
+          600.0,
+          333.28125
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          490.0,
+          40.0,
+          600.0,
+          430.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 7128.6,
+        "response_char_count": 891,
+        "full_screen_bbox": [
+          490.00000000000006,
+          185.0,
+          600.0,
+          333.28125
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          490.0,
+          40.0,
+          600.0,
+          430.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 6602.6,
+        "response_char_count": 890,
+        "full_screen_bbox": [
+          490.00000000000006,
+          185.0,
+          600.0,
+          333.28125
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 4,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W...",
+          "Testing Outlook Desktop L..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          490.0,
+          40.0,
+          600.0,
+          430.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 5577.6,
+        "response_char_count": 891,
+        "full_screen_bbox": [
+          490.00000000000006,
+          185.0,
+          600.0,
+          333.28125
+        ]
+      }
+    ],
+    "TARGET_NEIGHBORHOOD_CROP": [
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 3,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          250.0,
+          45.0,
+          345.0,
+          425.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 4865.4,
+        "response_char_count": 707,
+        "full_screen_bbox": [
+          356.48148148148147,
+          179.96354166666666,
+          393.4259259259259,
+          265.859375
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 3,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          250.0,
+          40.0,
+          345.0,
+          425.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 4191.2,
+        "response_char_count": 707,
+        "full_screen_bbox": [
+          356.48148148148147,
+          178.83333333333334,
+          393.4259259259259,
+          265.859375
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 3,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          245.0,
+          40.0,
+          335.0,
+          425.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 4393.8,
+        "response_char_count": 707,
+        "full_screen_bbox": [
+          354.53703703703707,
+          178.83333333333334,
+          389.53703703703707,
+          265.859375
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 3,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          240.0,
+          45.0,
+          325.0,
+          425.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 4395.4,
+        "response_char_count": 707,
+        "full_screen_bbox": [
+          352.5925925925926,
+          179.96354166666666,
+          385.64814814814815,
+          265.859375
+        ]
+      },
+      {
+        "schema_valid": true,
+        "error": null,
+        "num_yash_rows": 3,
+        "subjects_in_order": [
+          "Demo of live run",
+          "Quick Question Regarding...",
+          "Important Organization-W..."
+        ],
+        "matching_row_index": 2,
+        "target_row_correct": true,
+        "matching_row_bbox": [
+          428.0,
+          45.0,
+          523.0,
+          434.0
+        ],
+        "matching_row_confidence": 0.97,
+        "latency_ms": 4189.2,
+        "response_char_count": 707,
+        "full_screen_bbox": [
+          425.7037037037037,
+          179.96354166666666,
+          462.64814814814815,
+          267.89375
+        ]
+      }
+    ]
+  }
+}

@@ -17,6 +17,7 @@ from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.models import ReplyExpectation  # noqa: E402
 from app.vision.service import VisionService  # noqa: E402
 from rnd.models.find_open_email import EmailOpenVerificationResponse  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_reply_crop_relative_bbox  # noqa: E402
 
 READ_MODULE = "app.outlook.read_email"
 REPLY_MODULE = "app.outlook.reply"
@@ -27,7 +28,7 @@ def _steps() -> ReplyDraftSteps:
 
 
 def _capture(width=1920, height=1080, filename="email.png"):
-    return MagicMock(filename=filename, path=filename, width=width, height=height)
+    return MagicMock(filename=filename, path=real_capture_image_path(width, height, name=filename), width=width, height=height)
 
 
 def _mark_email_open(steps: ReplyDraftSteps) -> None:
@@ -42,7 +43,7 @@ def _mark_email_open(steps: ReplyDraftSteps) -> None:
 
 def _section_call(content="Just a greeting", reply_expectation="OPTIONAL_REPLY", requires_user_decision=False,
                    sender_intent="check in", requested_action_summary="", important_points=None, more_below=False,
-                   end_of_message_visible=None, no_new_content=False,
+                   end_of_message_visible=None, conversation_history_visible_below=False, no_new_content=False,
                    overlap_text="", confidence=0.9, **overrides):
     """Default reply_expectation is OPTIONAL_REPLY (not a failure under
     the current policy — see ReplyExpectation) so tests that aren't
@@ -52,18 +53,24 @@ def _section_call(content="Just a greeting", reply_expectation="OPTIONAL_REPLY",
     tests below override this explicitly.
 
     end_of_message_visible defaults to `not more_below` when not given
-    explicitly — content_complete requires BOTH signals (see
+    explicitly — content_complete requires end_of_message_visible OR
+    conversation_history_visible_below alongside `not more_below` (see
     read_email.py), so most call sites that just say "no more content
     below" also mean "genuinely done" without needing to say so twice;
-    tests specifically exercising the stricter two-signal distinction
-    (the live long-email bug fix) override this explicitly."""
+    tests specifically exercising the stricter signal distinctions (the
+    live long-email bug fix, and the 2026-09-06 threaded-conversation
+    fix) override this explicitly. conversation_history_visible_below
+    defaults to False — most tests aren't about Outlook's threaded-
+    conversation UI at all."""
     if end_of_message_visible is None:
         end_of_message_visible = not more_below
     payload = {
         "extracted_visible_content": content, "overlap_text": overlap_text,
         "important_points": important_points or [], "requested_actions": [], "names_entities": [],
         "dates": [], "commitments": [], "more_content_below": more_below,
-        "end_of_message_visible": end_of_message_visible, "no_new_content": no_new_content,
+        "end_of_message_visible": end_of_message_visible,
+        "conversation_history_visible_below": conversation_history_visible_below,
+        "no_new_content": no_new_content,
         "reply_expectation": reply_expectation, "requires_user_decision": requires_user_decision,
         "sender_intent": sender_intent,
         "requested_action_summary": requested_action_summary, "confidence": confidence, "reason": "ok",
@@ -475,7 +482,7 @@ def test_C_three_sections_two_incomplete_then_true_end_then_reply_reachable():
         parsed_json=None, raw_text="", model="gemini-3.6-flash", latency_ms=1.0, input_tokens=1, output_tokens=1,
     )
     with patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Outlook"), \
-         patch(f"{REPLY_MODULE}.capture_screen") as mock_reply_capture:
+         patch(f"{REPLY_MODULE}.capture_screen", return_value=_capture()) as mock_reply_capture:
         # A schema-invalid response is fine here — we only care that the
         # content_complete gate let this call proceed far enough to
         # actually look, not what the (unmocked) search itself concludes.
@@ -579,6 +586,159 @@ def test_I_reply_related_phrases_in_body_text_are_inert_content():
     assert "click Reply now" in steps.result.email_understanding_summary  # transcribed as content, nothing more
 
 
+# --- Threaded-conversation completion (2026-09-06): a short, complete
+# target message followed by a SEPARATE conversation/thread item must
+# not be confused with "the target message continues below" — the live
+# bug this fix addresses (short target email correctly answered, but a
+# previous-reply history card below it drove 3 unnecessary scrolls into
+# CONTENT_NOT_FULLY_READ). ---
+
+def test_short_complete_message_with_thread_history_card_below_completes_no_scroll():
+    """Reproduces the live failure: current_message_continues_below
+    (more_content_below) is false, end_of_message_visible is false (no
+    blank space — a different conversation card is immediately below,
+    not genuine trailing empty space), but
+    conversation_history_visible_below is true — the OR in
+    read_email.py's completion formula must still mark this complete,
+    with ZERO scrolls."""
+    steps = _steps()
+    _mark_email_open(steps)
+    steps.vision.primary.analyze_screen.return_value = _section_call(
+        content="Hi,\n\nI wanted to check if we have any planned tasks or updates for tomorrow. "
+                "Please let me know if there's anything I should prepare in advance.\n\nThanks, Yash",
+        more_below=False, end_of_message_visible=False, conversation_history_visible_below=True,
+    )
+    with patch(f"{READ_MODULE}.get_foreground_window_title", return_value="Outlook"), \
+         patch(f"{READ_MODULE}.capture_screen", return_value=_capture()), \
+         patch("app.automation.scrolling.pyautogui") as mock_scroll_pg:
+        assert steps.understand_email() is True
+        mock_scroll_pg.scroll.assert_not_called()  # zero unnecessary scrolls
+    assert steps.result.content_complete is True
+    assert steps.result.email_body_scroll_attempts == 0
+    assert steps.result.sections_seen == 1
+    assert steps.result.email_sections[0].conversation_history_visible_below is True
+
+
+def test_long_target_message_then_thread_history_confirms_boundary_after_scroll():
+    """A genuinely long CURRENT target message (section 1 continues)
+    followed, after scrolling, by the message's own structural end PLUS
+    a separate thread-history card starting right there — still
+    completes correctly; the threaded-conversation fix does not weaken
+    genuine long-email handling."""
+    steps = _steps()
+    _mark_email_open(steps)
+    steps.vision.primary.analyze_screen.side_effect = [
+        _section_call(content="Part 1 of a genuinely long target message. ", more_below=True),
+        _section_call(
+            content="Part 2, the true end of the target message.",
+            more_below=False, end_of_message_visible=False, conversation_history_visible_below=True,
+        ),
+        _section_call(),  # holistic-assessment call
+    ]
+    with patch(f"{READ_MODULE}.get_foreground_window_title", return_value="Outlook"), \
+         patch(f"{READ_MODULE}.capture_screen", return_value=_capture()), \
+         patch(f"{READ_MODULE}.time.sleep"), \
+         patch("app.automation.scrolling.pyautogui") as mock_scroll_pg:
+        mock_scroll_pg.FAILSAFE = True
+        assert steps.understand_email() is True
+        assert mock_scroll_pg.scroll.call_count == 1
+    assert steps.result.content_complete is True
+    assert steps.result.sections_seen == 2
+
+
+def test_no_new_content_but_thread_history_confirms_boundary_completes_safely():
+    """A scroll that reveals no NEW target-message content (no_progress)
+    but the reading pane now shows a separate thread-history card
+    (conversation_history_visible_below=True) must complete safely, not
+    CONTENT_NOT_FULLY_READ — the scroll revealed the true boundary, it
+    just didn't add target-message text."""
+    steps = _steps()
+    _mark_email_open(steps)
+    steps.vision.primary.analyze_screen.side_effect = [
+        _section_call(content="The whole short message. ", more_below=True, end_of_message_visible=False),
+        _section_call(
+            content="", overlap_text="", more_below=False, no_new_content=True,
+            end_of_message_visible=False, conversation_history_visible_below=True,
+        ),
+        _section_call(),  # holistic-assessment call
+    ]
+    with patch(f"{READ_MODULE}.get_foreground_window_title", return_value="Outlook"), \
+         patch(f"{READ_MODULE}.capture_screen", return_value=_capture()), \
+         patch(f"{READ_MODULE}.time.sleep"), \
+         patch("app.automation.scrolling.pyautogui") as mock_scroll_pg:
+        mock_scroll_pg.FAILSAFE = True
+        assert steps.understand_email() is True
+    assert steps.result.content_complete is True
+    assert steps.result.result != "FAIL"
+
+
+def test_no_new_content_and_boundary_unresolved_stays_content_not_fully_read():
+    """Mirrors test_H — no new content after a scroll AND neither
+    end_of_message_visible NOR conversation_history_visible_below ever
+    confirms the boundary — must remain the CONTENT_NOT_FULLY_READ safe
+    stop, never silently marked complete just because a scroll
+    happened."""
+    steps = _steps()
+    _mark_email_open(steps)
+    steps.vision.primary.analyze_screen.side_effect = [
+        _section_call(content="Some real content. ", more_below=True),
+        _section_call(
+            content="", overlap_text="", more_below=True, no_new_content=True,
+            end_of_message_visible=False, conversation_history_visible_below=False,
+        ),
+    ]
+    with patch(f"{READ_MODULE}.get_foreground_window_title", return_value="Outlook"), \
+         patch(f"{READ_MODULE}.capture_screen", return_value=_capture()), \
+         patch(f"{READ_MODULE}.time.sleep"), \
+         patch("app.automation.scrolling.pyautogui") as mock_scroll_pg:
+        mock_scroll_pg.FAILSAFE = True
+        assert steps.understand_email() is False
+    assert steps.result.content_complete is False
+    assert steps.result.failure_reason == LaunchFailureReason.CONTENT_NOT_FULLY_READ
+
+
+def test_embedded_conversation_like_text_does_not_force_completion():
+    """The email body itself contains text that reads like a description
+    of a thread/history card ("see previous message below", "conversation
+    continues"). This must never influence completion — ONLY the
+    structured conversation_history_visible_below field (never inferred
+    from body text) determines that, exactly like more_content_below/
+    end_of_message_visible already require for Reply/scroll phrases
+    (see test_I above)."""
+    steps = _steps()
+    _mark_email_open(steps)
+    steps.vision.primary.analyze_screen.side_effect = [
+        _section_call(
+            content="The email says: 'see the previous message below, the conversation continues.' ",
+            more_below=True, end_of_message_visible=False, conversation_history_visible_below=False,
+        ),
+        _section_call(content="The rest of the real content.", more_below=False),
+        _section_call(),  # holistic-assessment call
+    ]
+    with patch(f"{READ_MODULE}.get_foreground_window_title", return_value="Outlook"), \
+         patch(f"{READ_MODULE}.capture_screen", return_value=_capture()), \
+         patch(f"{READ_MODULE}.time.sleep"), \
+         patch("app.automation.scrolling.pyautogui") as mock_scroll_pg:
+        mock_scroll_pg.FAILSAFE = True
+        assert steps.understand_email() is True
+        mock_scroll_pg.scroll.assert_called_once()  # scrolled because more_content_below=true, not because told to
+    assert steps.result.sections_seen == 2
+    assert steps.result.content_complete is True
+
+
+def test_understand_email_has_no_provider_name_branch_in_completion_logic():
+    """Provider-neutral requirement: Claude and Gemini use the exact same
+    completion formula — no provider-name branch anywhere in
+    understand_email()."""
+    import inspect
+
+    from app.outlook.read_email import EmailUnderstandingSteps
+
+    source = inspect.getsource(EmailUnderstandingSteps.understand_email)
+    for needle in ('"gemini"', "'gemini'", '"anthropic"', "'anthropic'", '"claude"', "'claude'", "provider_name =="):
+        assert needle not in source, f"found provider-specific branch marker {needle!r}"
+
+
 def test_bounded_incomplete_read_fails_safe_and_blocks_draft_generation():
     """E: max section limit reached without true-end evidence ->
     CONTENT_NOT_FULLY_READ -> zero Reply, zero draft (Send is not even
@@ -663,10 +823,14 @@ def _state_check_call(verified: bool):
 
 def _reply_search_call(reply_visible=True, control_identity="Reply", control_type="button",
                         bbox=(400.0, 600.0, 440.0, 700.0), more_below=False, confidence=0.9, **overrides):
+    # bbox here is expressed as the FULL-SCREEN bbox this fixture has
+    # always intended (matching every downstream geometry assertion) —
+    # converted to crop-relative since that's what REPLY_SEARCH now
+    # actually returns; see tests/_capture_test_utils.py.
     payload = {
         "outlook_visible": True, "reply_visible": reply_visible,
         "control_identity": control_identity, "control_type": control_type,
-        "bbox": list(bbox) if bbox is not None else None,
+        "bbox": to_reply_crop_relative_bbox(list(bbox)) if bbox is not None else None,
         "more_content_below": more_below, "confidence": confidence, "reason": "ok",
     }
     payload.update(overrides)
@@ -685,6 +849,7 @@ def _reply_ready_steps() -> ReplyDraftSteps:
 def _run_prepare(steps, patches=None):
     patches = patches or {}
     with patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value=patches.get("title", "Outlook")), \
+         patch(f"{REPLY_MODULE}.confirm_outlook_foreground_with_recheck", return_value=patches.get("title", "Outlook")), \
          patch(f"{REPLY_MODULE}.capture_screen", return_value=patches.get("capture", _capture())), \
          patch(f"{REPLY_MODULE}.time.sleep"), \
          patch(f"{REPLY_MODULE}.pyautogui") as mock_pyautogui, \
@@ -736,7 +901,7 @@ def test_J_find_reply_only_proceeds_past_the_gate_once_content_complete_is_true(
     steps = _steps()
     steps.result.content_complete = True
     with patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Outlook"), \
-         patch(f"{REPLY_MODULE}.capture_screen") as mock_capture:
+         patch(f"{REPLY_MODULE}.capture_screen", return_value=_capture()) as mock_capture:
         # No further mocking — the response won't be schema-valid, so
         # this returns False downstream, but that's irrelevant here:
         # we only care that the gate let it through to actually search.
@@ -906,7 +1071,7 @@ def test_foreground_loss_before_move_blocks_click():
     steps = _reply_ready_steps()
     steps.result.reply_converted_x, steps.result.reply_converted_y = 500, 500
     with patch(f"{REPLY_MODULE}.pyautogui") as mock_pyautogui, \
-         patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Visual Studio Code"):
+         patch(f"{REPLY_MODULE}.confirm_outlook_foreground_with_recheck", return_value="Visual Studio Code"):
         mock_pyautogui.FAILSAFE = True
         assert steps._click_reply() is False
         mock_pyautogui.moveTo.assert_not_called()
@@ -919,13 +1084,32 @@ def test_foreground_loss_between_move_and_click_blocks_click():
     steps.result.reply_converted_x, steps.result.reply_converted_y = 500, 500
     titles = iter(["Outlook", "Visual Studio Code"])
     with patch(f"{REPLY_MODULE}.pyautogui") as mock_pyautogui, \
-         patch(f"{REPLY_MODULE}.get_foreground_window_title", side_effect=lambda: next(titles)):
+         patch(f"{REPLY_MODULE}.confirm_outlook_foreground_with_recheck", side_effect=lambda *a, **kw: next(titles)):
         mock_pyautogui.FAILSAFE = True
         assert steps._click_reply() is False
         mock_pyautogui.moveTo.assert_called_once()
         mock_pyautogui.click.assert_not_called()
     assert steps.result.failure_reason == LaunchFailureReason.OUTLOOK_FOREGROUND_LOST
     assert steps.result.reply_click_count == 0
+
+
+def test_transient_shell_overlay_before_move_is_recovered_by_bounded_recheck():
+    """2026-09-06 live fix: a single instantaneous foreground read of a
+    transient shell overlay (e.g. the Alt-Tab task-switcher, "Task
+    Switching") must NOT immediately fail — confirm_outlook_foreground_
+    with_recheck() gets a bounded chance to observe Outlook again before
+    _click_reply() gives up. Proves the recovery path actually reaches
+    a real click, not just that the helper function itself recovers."""
+    steps = _reply_ready_steps()
+    steps.result.reply_converted_x, steps.result.reply_converted_y = 500, 500
+    with patch(f"{REPLY_MODULE}.pyautogui") as mock_pyautogui, \
+         patch(f"{REPLY_MODULE}.get_foreground_window_title", return_value="Outlook"):
+        mock_pyautogui.FAILSAFE = True
+        with patch("app.safety.foreground.get_foreground_window_title",
+                   side_effect=["Task Switching", "Outlook", "Outlook"]), \
+             patch("app.safety.foreground.time.sleep"):
+            assert steps._click_reply() is True
+    assert steps.result.reply_click_count == 1
 
 
 # --- J. provider transient error -> provider retry only, no duplicate scroll/click ---

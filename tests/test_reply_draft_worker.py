@@ -23,6 +23,7 @@ from app.outlook.find_email import TARGET_EMAIL_SENDER, TARGET_EMAIL_SUBJECT  # 
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.service import VisionService  # noqa: E402
 from app.workers.reply_draft_worker import ReplyDraftWorker  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 LAUNCH_MODULE = "app.outlook.launch"
 FIND_MODULE = "app.outlook.find_email"
@@ -57,7 +58,7 @@ def _email_grounding():
             "candidate_count": 1,
             "candidates": [{
                 "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "date_or_order": "Today",
-                "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+                "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
             }],
             "more_content_below": False, "reason": "ok",
         },
@@ -143,10 +144,6 @@ def _patch_full_chain(stack: ExitStack, titles) -> dict:
     stack.enter_context(patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.maximize"))
-    stack.enter_context(patch(
-        f"{LAUNCH_MODULE}.get_environment_info",
-        return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True},
-    ))
     for module in (FIND_MODULE, READ_MODULE, REPLY_MODULE, DRAFT_MODULE):
         stack.enter_context(patch(f"{module}.get_foreground_window_title", return_value="Inbox - Outlook"))
 
@@ -157,7 +154,10 @@ def _patch_full_chain(stack: ExitStack, titles) -> dict:
     for module, name in ((FIND_MODULE, "b"), (READ_MODULE, "d"), (REPLY_MODULE, "c"), (DRAFT_MODULE, "e")):
         stack.enter_context(patch(
             f"{module}.capture_screen",
-            return_value=MagicMock(filename=f"{name}.png", path=f"{name}.png", width=1920, height=1080),
+            return_value=MagicMock(
+                filename=f"{name}.png", path=real_capture_image_path(1920, 1080, name=f"{name}.png"),
+                width=1920, height=1080,
+            ),
         ))
 
     return pyautogui_mocks

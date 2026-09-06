@@ -92,7 +92,6 @@ class ReplyDraftWorker(QObject):
 
         # --- Phases 6-7: prepare reply editor (state check, ground+click if needed) ---
         self.current_step.emit("FINDING_REPLY")
-        self.current_step.emit("REPLY_EDITOR_OPEN")
         self.vision_status.emit("Calling Claude (reply editor state / grounding)")
         if not steps.prepare_reply_editor():
             self.vision_status.emit("Idle")
@@ -106,6 +105,12 @@ class ReplyDraftWorker(QObject):
             self.vision_status.emit("Idle")
             self._finish_from_result(steps)
             return
+        # 2026-09-06 fix: REPLY_EDITOR_OPEN previously fired BEFORE
+        # prepare_reply_editor() even ran — now only fires once
+        # verify_reply_editor() has actually confirmed the editor is
+        # open, mirroring EMAIL_OPENED's placement (see send_worker.py's
+        # identical fix for the full rationale).
+        self.current_step.emit("REPLY_EDITOR_OPEN")
         self.metrics_update.emit(steps.result.model_dump(mode="json"))
 
         # --- Phase 9: draft generation ---

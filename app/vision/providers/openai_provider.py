@@ -41,7 +41,10 @@ class OpenAIProvider(VisionProvider):
         self.timeout_seconds = timeout_seconds
         self._client = openai.OpenAI(api_key=api_key, timeout=timeout_seconds)
 
-    def analyze_screen(self, image_path: Path, goal: str, prompt_text: str) -> ProviderCallResult:
+    def analyze_screen(self, image_path: Path, goal: str, prompt_text: str, stage: str = "") -> ProviderCallResult:
+        # stage is accepted for VisionProvider interface parity (see
+        # base.py) but not used — this provider is not part of the live
+        # runtime (never constructed by get_provider()/get_vision_service()).
         image_path = Path(image_path)
         image_b64 = base64.b64encode(image_path.read_bytes()).decode("ascii")
 

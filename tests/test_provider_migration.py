@@ -32,6 +32,7 @@ from app.vision.providers.gemini_provider import GeminiProvider  # noqa: E402
 from app.vision.providers.openai_provider import OpenAIProvider  # noqa: E402
 from app.vision.service import VisionService  # noqa: E402
 from app.workers.send_worker import SendWorker  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 LAUNCH_MODULE = "app.outlook.launch"
 FIND_MODULE = "app.outlook.find_email"
@@ -65,7 +66,7 @@ def _email_grounding():
         "outlook_visible": True, "message_list_visible": True, "target_visible": True, "candidate_count": 1,
         "candidates": [{
             "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "subject_truncated": False,
-            "date_or_order": "Today", "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+            "date_or_order": "Today", "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
         }],
         "more_content_below": False, "reason": "ok",
     })
@@ -98,9 +99,15 @@ def _draft_verification(semantic_match=True):
                      "confidence": 0.95, "reason": "ok"})
 
 
+def _send_composer_localization():
+    return _result({"composer_visible": True, "action_bar_visible": True,
+                     "action_bar_bbox": [900.0, 350.0, 980.0, 550.0], "composer_bbox": None,
+                     "confidence": 0.95, "reason": "ok"})
+
+
 def _send_search():
     return _result({"outlook_visible": True, "send_visible": True, "control_identity": "Send",
-                     "control_type": "button", "bbox": [400.0, 800.0, 440.0, 900.0], "confidence": 0.95, "reason": "ok"})
+                     "control_type": "button", "bbox": [619.0, 385.0, 837.0, 616.0], "confidence": 0.95, "reason": "ok"})
 
 
 def _sent_verification(verified=True):
@@ -132,10 +139,6 @@ def _patch_physical_actions(stack: ExitStack, titles) -> dict:
     stack.enter_context(patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.maximize"))
-    stack.enter_context(patch(
-        f"{LAUNCH_MODULE}.get_environment_info",
-        return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True},
-    ))
     for module in (FIND_MODULE, READ_MODULE, REPLY_MODULE, DRAFT_MODULE, SEND_MODULE):
         stack.enter_context(patch(f"{module}.get_foreground_window_title", return_value="Inbox - Outlook"))
 
@@ -148,7 +151,10 @@ def _patch_physical_actions(stack: ExitStack, titles) -> dict:
     ):
         stack.enter_context(patch(
             f"{module}.capture_screen",
-            return_value=MagicMock(filename=f"{name}.png", path=f"{name}.png", width=1920, height=1080),
+            return_value=MagicMock(
+                filename=f"{name}.png", path=real_capture_image_path(1920, 1080, name=f"{name}.png"),
+                width=1920, height=1080,
+            ),
         ))
     return pyautogui_mocks
 
@@ -165,6 +171,7 @@ def _full_chain_side_effects():
         _state_check(True),          # verify_reply_editor
         _draft_generation(),
         _draft_verification(True),
+        _send_composer_localization(),
         _send_search(),
         _sent_verification(True),
     ]
@@ -175,6 +182,10 @@ def _full_chain_side_effects():
 
 def test_BCDE_full_send_worker_flow_uses_only_anthropic_every_stage(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "anthropic")  # this suite asserts Claude-only behavior regardless of the real .env
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     signals = {"success": [], "failure": [], "current_step": []}
     worker = SendWorker(AbortController(), bounded_approval_granted=True, send_approval_granted=True)
     worker.success.connect(lambda r: signals["success"].append(r))
@@ -192,12 +203,13 @@ def test_BCDE_full_send_worker_flow_uses_only_anthropic_every_stage(monkeypatch)
     result = signals["success"][0]
     assert result["result"] == "PASS"
     assert result["send_click_count"] == 1
-    # D: every one of the 11 stages went through Anthropic — 12 calls total
+    # D: every one of the 12 stages went through Anthropic — 13 calls total
     # (Outlook search, readiness, email search, email-open verify, email
     # extraction + holistic assessment [2026-09-04 split], reply-editor-
     # already-open check, reply-editor verify, draft generation [E],
-    # draft verification, Send grounding, sent verify).
-    assert mock_analyze.call_count == 12
+    # draft verification, Send composer localization [2026-09-06 two-
+    # stage Send-grounding architecture], Send grounding, sent verify).
+    assert mock_analyze.call_count == 13
     mock_gemini_init.assert_not_called()   # B
     mock_openai_init.assert_not_called()   # C
 
@@ -206,6 +218,10 @@ def test_BCDE_full_send_worker_flow_uses_only_anthropic_every_stage(monkeypatch)
 
 def test_F_H_transient_claude_error_retries_claude_only_no_physical_repeat(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "anthropic")  # this suite asserts Claude-only behavior regardless of the real .env
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     side_effects = list(_full_chain_side_effects())
     # First call (Outlook search grounding) fails once transiently, then succeeds.
     side_effects[0] = NetworkError("[Errno 10054] connection reset")
@@ -227,14 +243,20 @@ def test_F_H_transient_claude_error_retries_claude_only_no_physical_repeat(monke
     result = signals["success"][0]
     assert result["provider_retries"] == 1
     # The retry repeated ONLY the Claude request — the Outlook-result
-    # click still happened exactly once, never twice.
-    assert mocks["launch"].click.call_count == 1
+    # ACTIVATION (Enter key, 2026-09-06 keyboard-activation fix, not a
+    # click) still happened exactly once, never twice.
+    assert mocks["launch"].click.call_count == 0
+    assert mocks["launch"].press.call_count == 2  # Windows key + Enter
 
 
 # --- G: final Claude failure -> TECHNICAL_PROVIDER_ERROR ---
 
 def test_G_persistent_claude_failure_yields_technical_provider_error(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "anthropic")  # this suite asserts Claude-only behavior regardless of the real .env
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     signals = {"success": [], "failure": []}
     worker = SendWorker(AbortController(), bounded_approval_granted=True, send_approval_granted=True)
     worker.success.connect(lambda r: signals["success"].append(r))
@@ -270,6 +292,10 @@ def test_I_gemini_mode_never_needs_anthropic_or_openai_env_vars(monkeypatch, tmp
     empty_env.write_text("", encoding="utf-8")
     monkeypatch.setattr(settings, "PROJECT_ROOT", tmp_path)
     monkeypatch.setenv("AI_PROVIDER", "gemini")
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-fake-key")
     monkeypatch.setenv("GEMINI_MODEL", "gemini-3.6-flash")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -291,6 +317,10 @@ def test_I_anthropic_mode_never_needs_gemini_or_openai_env_vars(monkeypatch, tmp
     empty_env.write_text("", encoding="utf-8")
     monkeypatch.setattr(settings, "PROJECT_ROOT", tmp_path)
     monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
     monkeypatch.setenv("ANTHROPIC_MODEL", "claude-sonnet-5")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -343,7 +373,9 @@ def test_K_malformed_claude_json_fails_safely_not_silently_repaired():
     )
     steps.vision.primary.analyze_screen.return_value = malformed
     with patch(f"{FIND_MODULE}.get_foreground_window_title", return_value="Inbox - Outlook"), \
-         patch(f"{FIND_MODULE}.capture_screen", return_value=MagicMock(filename="x.png", path="x.png", width=1920, height=1080)):
+         patch(f"{FIND_MODULE}.capture_screen", return_value=MagicMock(
+             filename="x.png", path=real_capture_image_path(1920, 1080, name="x.png"), width=1920, height=1080,
+         )):
         assert steps.find_target_email() is False
     assert steps.result.result == "ERROR"
     assert steps.result.failure_reason == LaunchFailureReason.TECHNICAL_PROVIDER_ERROR

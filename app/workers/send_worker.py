@@ -152,7 +152,6 @@ class SendWorker(QObject):
 
         # --- Phases 6-7: prepare reply editor ---
         self.current_step.emit("FINDING_REPLY")
-        self.current_step.emit("REPLY_EDITOR_OPEN")
         self.vision_status.emit("Calling Claude (reply editor state / grounding)")
         if not steps.prepare_reply_editor():
             self.vision_status.emit("Idle")
@@ -165,6 +164,16 @@ class SendWorker(QObject):
             self.vision_status.emit("Idle")
             self._finish_from_result(steps)
             return
+        # 2026-09-06 fix: REPLY_EDITOR_OPEN previously fired BEFORE
+        # prepare_reply_editor() even ran (a live run showed this step
+        # name emitted while the editor had not actually opened yet, and
+        # a crash immediately afterward left the playbook's last-known
+        # step misleadingly claiming success). It now only fires once
+        # verify_reply_editor() has actually confirmed the editor is
+        # open — mirroring EMAIL_OPENED, which is likewise only emitted
+        # after email-open verification succeeds, never before the
+        # corresponding step function runs.
+        self.current_step.emit("REPLY_EDITOR_OPEN")
         self.metrics_update.emit(steps.result.model_dump(mode="json"))
 
         # --- Phase 9: draft generation ---

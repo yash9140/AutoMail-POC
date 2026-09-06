@@ -28,9 +28,6 @@ def _capture(width=1920, height=1080, filename="search.png"):
     return MagicMock(filename=filename, path=filename, width=width, height=height)
 
 
-_ENV_INFO_MATCH = {"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True}
-
-
 # --- Windows key / typing: exactly once, no Enter ---
 
 def test_windows_key_issued_once():
@@ -65,15 +62,17 @@ def test_no_enter_pressed_before_vision_verification():
         assert press_calls == ["win"]
 
 
-# --- Vision grounding: coordinate conversion, out-of-bounds, non-Outlook rejection ---
+# --- Vision grounding: SEMANTIC verification only (2026-09-06 keyboard-
+# activation fix) — no coordinate conversion happens for this stage
+# anymore; bbox is accepted/logged for diagnostics only. ---
 
-def test_grounding_converts_0_1000_coordinates_to_pixels():
+def test_grounding_never_computes_a_click_point():
+    """bbox is diagnostic-only for OUTLOOK_SEARCH now — raw_x/raw_y/
+    converted_x/converted_y must stay None even on a valid, schema-valid
+    desktop_app result, proving the bbox is genuinely non-actionable."""
     steps = _steps()
     steps.result.screen_width, steps.result.screen_height = 1920, 1080
     call = MagicMock(
-        # bbox = [y_min, x_min, y_max, x_max] — center is (500, 250), same
-        # as the old point this test replaces, so the expected converted_x/y
-        # assertions below are unchanged.
         parsed_json={"search_visible": True, "target_visible": True, "target_type": "desktop_app",
                      "visible_label": "Outlook",
                      "bbox": [200.0, 400.0, 300.0, 600.0], "confidence": 0.9, "reason": "clear match"},
@@ -81,37 +80,12 @@ def test_grounding_converts_0_1000_coordinates_to_pixels():
     )
     steps.vision.primary.analyze_screen.return_value = call
 
-    with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
-        assert steps.ground_search_result(_capture()) is True
-    assert steps.result.raw_x == 500
-    assert steps.result.raw_y == 250
-    assert steps.result.converted_x == round(500 / 1000 * 1920)
-    assert steps.result.converted_y == round(250 / 1000 * 1080)
-    assert steps.result.coordinate_in_screen_bounds is True
-    assert steps.result.search_grounding_bbox_pixels == [
-        round(200 / 1000 * 1080), round(400 / 1000 * 1920), round(300 / 1000 * 1080), round(600 / 1000 * 1920),
-    ]
-
-
-def test_out_of_normalized_range_bbox_rejected():
-    """A bbox with components outside the 0-1000 contract (i.e. Claude
-    reporting something that looks like native pixels, or otherwise
-    off-contract) must be rejected outright, never silently clamped or
-    scaled — this is the case validate_grounding() catches before any
-    pixel conversion is even attempted."""
-    steps = _steps()
-    steps.result.screen_width, steps.result.screen_height = 1920, 1080
-    call = MagicMock(
-        parsed_json={"search_visible": True, "target_visible": True, "target_type": "desktop_app",
-                     "visible_label": "Outlook",
-                     "bbox": [1200.0, 1200.0, 1400.0, 1400.0], "confidence": 0.9, "reason": "far off"},
-        raw_text="{}", model="gemini-3.6-flash", latency_ms=100.0, input_tokens=10, output_tokens=5,
-    )
-    steps.vision.primary.analyze_screen.return_value = call
-
-    with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
-        assert steps.ground_search_result(_capture()) is False
-    assert steps.result.failure_reason == LaunchFailureReason.GROUNDING_INVALID
+    assert steps.ground_search_result(_capture()) is True
+    assert steps.result.search_grounding.bbox == [200.0, 400.0, 300.0, 600.0]  # reported/logged
+    assert steps.result.raw_x is None
+    assert steps.result.raw_y is None
+    assert steps.result.converted_x is None
+    assert steps.result.converted_y is None
 
 
 def test_low_confidence_rejected():
@@ -125,8 +99,7 @@ def test_low_confidence_rejected():
     )
     steps.vision.primary.analyze_screen.return_value = call
 
-    with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
-        assert steps.ground_search_result(_capture()) is False
+    assert steps.ground_search_result(_capture()) is False
     assert steps.result.failure_reason == LaunchFailureReason.GROUNDING_INVALID
 
 
@@ -141,44 +114,41 @@ def test_non_outlook_result_rejected():
     )
     steps.vision.primary.analyze_screen.return_value = call
 
-    with patch(f"{MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH):
-        assert steps.ground_search_result(_capture()) is False
+    assert steps.ground_search_result(_capture()) is False
     assert steps.result.failure_reason == LaunchFailureReason.OUTLOOK_RESULT_NOT_FOUND
 
 
-# --- Click gating: no click without approval, dual foreground checks ---
+# --- Activation gating: no Enter without approval, foreground check ---
 
-def test_click_refused_without_human_approval():
+def test_activation_refused_without_human_approval():
     steps = _steps()
-    steps.result.converted_x, steps.result.converted_y = 100, 100
     with pytest.raises(RuntimeError):
-        steps.click_outlook_result()
+        steps.activate_outlook_result()
 
 
-def test_click_blocked_when_search_state_lost_before_move():
+def test_activation_blocked_when_search_state_lost():
     steps = _steps()
     steps.result.human_target_approved = True
-    steps.result.converted_x, steps.result.converted_y = 100, 100
     with patch(f"{MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{MODULE}.get_foreground_window_title", return_value="Visual Studio Code"):
         mock_pyautogui.FAILSAFE = True
-        assert steps.click_outlook_result() is False
-        mock_pyautogui.moveTo.assert_not_called()
-        mock_pyautogui.click.assert_not_called()
+        assert steps.activate_outlook_result() is False
+        mock_pyautogui.press.assert_not_called()
     assert steps.result.failure_reason == LaunchFailureReason.SEARCH_STATE_LOST_BEFORE_CLICK
 
 
-def test_click_executed_once_when_search_state_holds():
+def test_activation_presses_enter_exactly_once_when_search_state_holds():
     steps = _steps()
     steps.result.human_target_approved = True
-    steps.result.converted_x, steps.result.converted_y = 100, 100
     with patch(f"{MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{MODULE}.get_foreground_window_title", return_value="Search"):
         mock_pyautogui.FAILSAFE = True
-        assert steps.click_outlook_result() is True
-        mock_pyautogui.moveTo.assert_called_once()
-        mock_pyautogui.click.assert_called_once_with()
-    assert steps.result.mouse_click_count == 1
+        assert steps.activate_outlook_result() is True
+        mock_pyautogui.press.assert_called_once_with("enter")
+        mock_pyautogui.moveTo.assert_not_called()
+        mock_pyautogui.click.assert_not_called()
+    assert steps.result.keyboard_action_count == 1
+    assert steps.result.mouse_click_count == 0
 
 
 # --- Readiness: splash screen never counted as ready ---

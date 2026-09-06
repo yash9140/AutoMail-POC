@@ -1,0 +1,57 @@
+You are re-inspecting the SAME cropped Outlook screenshot you (or another
+call) already looked at once for this exact reply composer. The previous
+candidate you or a prior call reported for Send was found to be
+geometrically inconsistent with the composer's own action-bar region —
+it did not land where the action bar (Send + its dropdown + Discard) was
+independently localized to be. You do not know why that happened; do not
+assume the previous answer, do not repeat it, and do not adjust it by a
+small offset. Look at this image again from scratch.
+
+Image dimensions (this is a tight crop around the composer's action-bar
+area — report every coordinate below relative to THIS image only, not
+any larger screen):
+width = {width}
+height = {height}
+
+Find the control that is the standard Send action for this reply
+composer (typically a button or ribbon/toolbar item labeled "Send",
+sometimes shown only as an icon with that meaning).
+
+CRITICAL — accept ONLY a control that clearly represents Send itself,
+performing an immediate send action. Do NOT report as a match, even if
+visible nearby or labeled similarly:
+- the Send dropdown/chevron (a separate small arrow control next to Send
+  that opens a menu — e.g. "Send Later", "Schedule Send" — this is NOT
+  Send itself)
+- Discard
+- any formatting/toolbar control (bold, italic, attach, insert, etc.)
+- Schedule Send, Send Later, or any delayed/scheduled-send variant
+- Forward, Reply, Reply All, Delete, or any draft/save control
+- the word "send" appearing inside the email BODY TEXT (not a control)
+
+If you cannot find a control that is unambiguously Send itself, report
+send_visible=false — do NOT report a nearby or similar control as if it
+were Send.
+
+If the Send control is visible, report its bounding box as [y_min,
+x_min, y_max, x_max] in the same 0-1000 normalized coordinate space
+used throughout this project, relative to THIS cropped image. The box
+must cover the FULL CLICKABLE CONTROL — the entire clickable
+button/icon area — never just a text label fragment, never the
+dropdown chevron beside it, and never an unrelated nearby icon.
+
+Analyze only what is visually present in this screenshot. Do not assume
+Send is present if you cannot actually see it. Do not invent a match.
+
+Return ONLY the following structured JSON, with no other text before
+or after it:
+
+{{
+  "outlook_visible": <true if this is recognizably the Outlook mail interface>,
+  "send_visible": <true only if a control unambiguously identifiable as Send itself is visible>,
+  "control_identity": "<the exact label/identity of the control you found, e.g. 'Send', 'Send dropdown', 'Discard' — empty string if none found>",
+  "control_type": "<e.g. 'button', 'ribbon icon', 'toolbar item' — empty string if none found>",
+  "bbox": [<y_min>, <x_min>, <y_max>, <x_max>] or null if send_visible is false,
+  "confidence": <float between 0.0 and 1.0>,
+  "reason": "<string>"
+}}

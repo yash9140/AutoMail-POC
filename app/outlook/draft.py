@@ -449,6 +449,20 @@ class ReplyDraftSteps(EmailUnderstandingSteps, ReplyDiscoverySteps, DraftSteps):
         self.result.target_subject = self.find_open.result.target_subject
         self.result.target_sender = self.find_open.result.target_sender
         self._session_start_monotonic: Optional[float] = None
+        # REPLY_SEARCH Vision-input crop cache (2026-09-06), keyed by the
+        # ORIGINAL full screenshot's own path — see
+        # ReplyDiscoverySteps._get_reply_vision_crop(). Mirrors
+        # FindOpenEmailSteps' own message-list crop cache; kept as a
+        # SEPARATE cache/type (never shared) since the two crops are
+        # independently calibrated for different visual tasks.
+        self._reply_vision_crop_cache: dict[str, "HorizontalVisionCrop"] = {}
+        # Bounded email-body scroll-boost flag (2026-09-06 long-email
+        # scroll-distance fix) — see EmailUnderstandingSteps.
+        # _scroll_email_body_with_safety_checks() in app/outlook/
+        # read_email.py. True only between a scroll whose movement guard
+        # found insufficient visual change and the NEXT scroll (which
+        # consumes it) — never persists across a completed run.
+        self._email_body_scroll_boost_pending: bool = False
 
     def start_session(self) -> None:
         self._session_start_monotonic = time.monotonic()

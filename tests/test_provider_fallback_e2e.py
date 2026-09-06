@@ -44,6 +44,7 @@ from app.vision.providers.anthropic_provider import AnthropicProvider  # noqa: E
 from app.vision.providers.base import NetworkError, ProviderCallResult  # noqa: E402
 from app.vision.providers.gemini_provider import GeminiProvider  # noqa: E402
 from app.workers.send_worker import SendWorker  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 LAUNCH_MODULE = "app.outlook.launch"
 FIND_MODULE = "app.outlook.find_email"
@@ -76,7 +77,7 @@ def _email_grounding():
         "outlook_visible": True, "message_list_visible": True, "target_visible": True, "candidate_count": 1,
         "candidates": [{
             "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "subject_truncated": False,
-            "date_or_order": "Today", "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+            "date_or_order": "Today", "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
         }],
         "more_content_below": False, "reason": "ok",
     })
@@ -88,9 +89,9 @@ def _email_grounding_ambiguous_multiple_exact_matches():
     disambiguate because neither date_or_order says "today"/"newest"."""
     row = {
         "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "subject_truncated": False,
-        "date_or_order": "Yesterday", "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+        "date_or_order": "Yesterday", "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
     }
-    row2 = dict(row, row_bbox=[540.0, 300.0, 580.0, 900.0], date_or_order="2 days ago")
+    row2 = dict(row, row_bbox=to_crop_relative_bbox([540.0, 300.0, 580.0, 480.0]), date_or_order="2 days ago")
     return _result({
         "outlook_visible": True, "message_list_visible": True, "target_visible": True, "candidate_count": 2,
         "candidates": [row, row2], "more_content_below": False, "reason": "ok",
@@ -124,9 +125,15 @@ def _draft_verification(semantic_match=True):
                      "confidence": 0.95, "reason": "ok"})
 
 
+def _send_composer_localization():
+    return _result({"composer_visible": True, "action_bar_visible": True,
+                     "action_bar_bbox": [900.0, 350.0, 980.0, 550.0], "composer_bbox": None,
+                     "confidence": 0.95, "reason": "ok"})
+
+
 def _send_search():
     return _result({"outlook_visible": True, "send_visible": True, "control_identity": "Send",
-                     "control_type": "button", "bbox": [400.0, 800.0, 440.0, 900.0], "confidence": 0.95, "reason": "ok"})
+                     "control_type": "button", "bbox": [619.0, 385.0, 837.0, 616.0], "confidence": 0.95, "reason": "ok"})
 
 
 def _sent_verification(verified=True):
@@ -152,10 +159,6 @@ def _patch_physical_actions(stack: ExitStack, titles) -> dict:
     stack.enter_context(patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.maximize"))
-    stack.enter_context(patch(
-        f"{LAUNCH_MODULE}.get_environment_info",
-        return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True},
-    ))
     for module in (FIND_MODULE, READ_MODULE, REPLY_MODULE, DRAFT_MODULE, SEND_MODULE):
         stack.enter_context(patch(f"{module}.get_foreground_window_title", return_value="Inbox - Outlook"))
 
@@ -168,7 +171,10 @@ def _patch_physical_actions(stack: ExitStack, titles) -> dict:
     ):
         stack.enter_context(patch(
             f"{module}.capture_screen",
-            return_value=MagicMock(filename=f"{name}.png", path=f"{name}.png", width=1920, height=1080),
+            return_value=MagicMock(
+                filename=f"{name}.png", path=real_capture_image_path(1920, 1080, name=f"{name}.png"),
+                width=1920, height=1080,
+            ),
         ))
     return pyautogui_mocks
 
@@ -183,7 +189,7 @@ def _full_chain_side_effects():
         _understanding(), _understanding(),
         _state_check(True), _state_check(True),
         _draft_generation(), _draft_verification(True),
-        _send_search(), _sent_verification(True),
+        _send_composer_localization(), _send_search(), _sent_verification(True),
     ]
 
 
@@ -230,9 +236,11 @@ def test_claude_outlook_search_timeout_gemini_fallback_same_screenshot_pipeline_
     assert result["fallback_uses"] == 1
     assert result["send_click_count"] == 1
     assert mock_gemini.call_count == 1  # fallback used exactly once, for exactly the failed stage
-    # The Outlook-result click still only happens once — fallback never
-    # doubles a physical action.
-    assert mocks["launch"].click.call_count == 1
+    # The Outlook-result ACTIVATION (Enter key, 2026-09-06 keyboard-
+    # activation fix, not a click) still only happens once — fallback
+    # never doubles a physical action.
+    assert mocks["launch"].click.call_count == 0
+    assert mocks["launch"].press.call_count == 2  # Windows key + Enter
 
 
 # --- 2: SEND_GROUNDING technical failure -> fallback BEFORE the Send
@@ -240,10 +248,11 @@ def test_claude_outlook_search_timeout_gemini_fallback_same_screenshot_pipeline_
 
 def test_send_grounding_technical_failure_falls_back_before_click_one_click_max(monkeypatch):
     anthropic_effects = list(_full_chain_side_effects())
-    # SEND_GROUNDING (index 10) fails BOTH same-provider attempts before
-    # fallback is considered.
-    anthropic_effects[10] = NetworkError("timed out")
-    anthropic_effects.insert(11, NetworkError("timed out again"))
+    # SEND_COMPOSER_LOCALIZATION (index 10) succeeds normally on Claude;
+    # SEND_GROUNDING (index 11, 2026-09-06 two-stage architecture) fails
+    # BOTH same-provider attempts before fallback is considered.
+    anthropic_effects[11] = NetworkError("timed out")
+    anthropic_effects.insert(12, NetworkError("timed out again"))
     gemini_effects = [_send_search()]  # fallback grounds Send instead
 
     signals, mocks, mock_anthropic, mock_gemini = _run_worker(monkeypatch, anthropic_effects, gemini_effects)
@@ -262,11 +271,11 @@ def test_send_grounding_technical_failure_falls_back_before_click_one_click_max(
 
 def test_send_verification_technical_failure_after_click_falls_back_never_resends(monkeypatch):
     anthropic_effects = list(_full_chain_side_effects())
-    # SEND_VERIFICATION (index 11, the LAST call — Send has already been
+    # SEND_VERIFICATION (index 12, the LAST call — Send has already been
     # physically clicked by this point) fails BOTH same-provider attempts
     # before fallback is considered.
-    anthropic_effects[11] = NetworkError("timed out")
-    anthropic_effects.insert(12, NetworkError("timed out again"))
+    anthropic_effects[12] = NetworkError("timed out")
+    anthropic_effects.insert(13, NetworkError("timed out again"))
     gemini_effects = [_sent_verification(True)]  # fallback confirms sent
 
     signals, mocks, mock_anthropic, mock_gemini = _run_worker(monkeypatch, anthropic_effects, gemini_effects)

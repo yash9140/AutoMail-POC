@@ -32,6 +32,7 @@ from app.vision.providers.base import NetworkError, ProviderCallResult  # noqa: 
 from app.vision.providers.gemini_provider import GeminiProvider  # noqa: E402
 from app.vision.providers.openai_provider import OpenAIProvider  # noqa: E402
 from app.workers.send_worker import SendWorker  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 LAUNCH_MODULE = "app.outlook.launch"
 FIND_MODULE = "app.outlook.find_email"
@@ -78,7 +79,7 @@ def _email_grounding():
         "outlook_visible": True, "message_list_visible": True, "target_visible": True, "candidate_count": 1,
         "candidates": [{
             "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "subject_truncated": False,
-            "date_or_order": "Today", "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+            "date_or_order": "Today", "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
         }],
         "more_content_below": False, "reason": "ok",
     })
@@ -111,9 +112,15 @@ def _draft_verification(semantic_match=True):
                      "confidence": 0.95, "reason": "ok"})
 
 
+def _send_composer_localization():
+    return _result({"composer_visible": True, "action_bar_visible": True,
+                     "action_bar_bbox": [900.0, 350.0, 980.0, 550.0], "composer_bbox": None,
+                     "confidence": 0.95, "reason": "ok"})
+
+
 def _send_search():
     return _result({"outlook_visible": True, "send_visible": True, "control_identity": "Send",
-                     "control_type": "button", "bbox": [400.0, 800.0, 440.0, 900.0], "confidence": 0.95, "reason": "ok"})
+                     "control_type": "button", "bbox": [619.0, 385.0, 837.0, 616.0], "confidence": 0.95, "reason": "ok"})
 
 
 def _sent_verification(verified=True):
@@ -127,7 +134,7 @@ def _full_chain_side_effects():
         _understanding(), _understanding(),  # extraction call, then holistic-assessment call (2026-09-04 split)
         _state_check(True), _state_check(True),
         _draft_generation(), _draft_verification(True),
-        _send_search(), _sent_verification(True),
+        _send_composer_localization(), _send_search(), _sent_verification(True),
     ]
 
 
@@ -153,10 +160,6 @@ def _patch_physical_actions(stack: ExitStack, titles) -> dict:
     stack.enter_context(patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.maximize"))
-    stack.enter_context(patch(
-        f"{LAUNCH_MODULE}.get_environment_info",
-        return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True},
-    ))
     for module in (FIND_MODULE, READ_MODULE, REPLY_MODULE, DRAFT_MODULE, SEND_MODULE):
         stack.enter_context(patch(f"{module}.get_foreground_window_title", return_value="Inbox - Outlook"))
 
@@ -169,7 +172,10 @@ def _patch_physical_actions(stack: ExitStack, titles) -> dict:
     ):
         stack.enter_context(patch(
             f"{module}.capture_screen",
-            return_value=MagicMock(filename=f"{name}.png", path=f"{name}.png", width=1920, height=1080),
+            return_value=MagicMock(
+                filename=f"{name}.png", path=real_capture_image_path(1920, 1080, name=f"{name}.png"),
+                width=1920, height=1080,
+            ),
         ))
 
     return pyautogui_mocks
@@ -185,6 +191,10 @@ def test_A_ai_provider_gemini_returns_gemini_provider(monkeypatch, tmp_path):
     empty_env.write_text("", encoding="utf-8")
     monkeypatch.setattr(settings, "PROJECT_ROOT", tmp_path)
     monkeypatch.setenv("AI_PROVIDER", "gemini")
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     monkeypatch.setenv("GEMINI_MODEL", "gemini-3.6-flash")
     provider, model = settings.get_provider()
@@ -198,6 +208,10 @@ def test_A_ai_provider_gemini_returns_gemini_provider(monkeypatch, tmp_path):
 
 def test_BCDEHI_full_send_worker_flow_uses_only_gemini_every_stage(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "gemini")  # this suite asserts Gemini-only behavior regardless of the real .env
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     monkeypatch.setenv("GEMINI_MODEL", "gemini-3.6-flash")
 
@@ -230,22 +244,28 @@ def test_BCDEHI_full_send_worker_flow_uses_only_gemini_every_stage(monkeypatch):
     assert signals["current_step"] == EXPECTED_HAPPY_PATH_STEP_SEQUENCE
     assert signals["current_step"][-1] == "COMPLETED"
 
-    # B/D: every one of the 11 stages went through Gemini only — 12 calls
+    # B/D: every one of the 12 stages went through Gemini only — 13 calls
     # total (email understanding split into extraction + holistic
-    # assessment, 2026-09-04 latency fix).
-    assert mock_analyze.call_count == 12
+    # assessment, 2026-09-04 latency fix; Send grounding split into
+    # SEND_COMPOSER_LOCALIZATION + SEND_GROUNDING, 2026-09-06 two-stage
+    # Send-grounding architecture).
+    assert mock_analyze.call_count == 13
     mock_anthropic_init.assert_not_called()  # C
     mock_openai_init.assert_not_called()     # D
     # E: no fallback — Gemini succeeded on every call, so retries stayed 0
     # and no other provider was ever touched (asserted above).
 
-    assert mocks["launch"].click.call_count == 1
+    assert mocks["launch"].click.call_count == 0  # OUTLOOK_SEARCH activates via Enter, never a click
     assert mocks["find"].click.call_count == 1
     assert mocks["send"].click.call_count == 1
 
 
 def test_E_transient_gemini_error_retries_gemini_only_no_fallback_no_physical_repeat(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "gemini")
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     monkeypatch.setenv("GEMINI_MODEL", "gemini-3.6-flash")
 
@@ -268,7 +288,8 @@ def test_E_transient_gemini_error_retries_gemini_only_no_fallback_no_physical_re
     assert signals["success"], f"expected success, got failure={signals['failure']}"
     result = signals["success"][0]
     assert result["provider_retries"] == 1  # retried Gemini only — no fallback to another provider
-    assert mocks["launch"].click.call_count == 1  # never repeated the physical click
+    assert mocks["launch"].click.call_count == 0  # OUTLOOK_SEARCH activates via Enter, never a click
+    assert mocks["launch"].press.call_count == 2  # Windows key + Enter, never repeated
 
 
 # --- F/G: Gemini OUTLOOK_SEARCH now uses the SAME bbox contract Claude
@@ -290,23 +311,19 @@ def test_FG_gemini_outlook_search_uses_the_same_unified_bbox_contract_as_claude(
     capture = MagicMock(filename="s.png", path="s.png", width=1920, height=1080)
     mock_provider.analyze_screen.return_value = _search_grounding()
 
-    with patch(f"{LAUNCH_MODULE}.get_environment_info",
-               return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True}):
-        assert steps.ground_search_result(capture) is True
+    assert steps.ground_search_result(capture) is True
 
-    # F: the unified bbox contract was used regardless of provider —
-    # self.result.search_grounding is populated, with a bbox-CENTER click
-    # point (never a loose x/y).
+    # F: the unified SEMANTIC-verification contract was used regardless
+    # of provider — self.result.search_grounding is populated, bbox
+    # reported/logged for diagnostics only (2026-09-06 keyboard-
+    # activation fix: no click point is ever computed for this stage).
     assert steps.result.search_grounding is not None
     assert steps.result.search_grounding.bbox == [250.0, 400.0, 350.0, 600.0]
-    center_x_norm, center_y_norm = (400.0 + 600.0) / 2, (250.0 + 350.0) / 2
-    assert steps.result.converted_x == round(center_x_norm / 1000 * 1920)
-    assert steps.result.converted_y == round(center_y_norm / 1000 * 1080)
+    assert steps.result.converted_x is None
+    assert steps.result.converted_y is None
 
     # G: the historical Gemini-only point-based field (inherited from
     # RND009BResult) is never populated by the live dispatch anymore,
     # for either provider.
     assert steps.result.grounding is None
-    # bbox_tightly_scoped defaulted True in the fixture above, so the
-    # bounded refine pass never fires — only ONE Vision call total.
     assert mock_provider.analyze_screen.call_count == 1

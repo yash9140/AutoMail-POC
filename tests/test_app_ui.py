@@ -430,15 +430,18 @@ def test_rnd009b_never_advances_to_finding_email():
 def test_outlook_launch_steps_pyautogui_usage_is_tightly_scoped():
     """Structural safety proof for the one module in app/ that legitimately
     touches pyautogui: exactly one Windows-key press, one text-write call,
-    one mouse move, one click — no Send-related hotkey anywhere."""
+    one Enter-key activation press — no mouse move/click for OUTLOOK_SEARCH
+    (2026-09-06 keyboard-activation fix; Vision's bbox is no longer
+    actionable for this stage), no Send-related hotkey anywhere."""
     import app.outlook.launch as mod
 
     source = inspect.getsource(mod)
     normalized = source.replace('"', "'")
     assert normalized.count("pyautogui.press('win')") == 1
     assert normalized.count("pyautogui.write(") == 1
-    assert source.count("pyautogui.moveTo(") == 1
-    assert normalized.count("pyautogui.click()") == 1
+    assert normalized.count("pyautogui.press('enter')") == 1
+    assert source.count("pyautogui.moveTo(") == 0
+    assert normalized.count("pyautogui.click()") == 0
     assert "hotkey('ctrl', 'enter')" not in normalized
     assert "hotkey('alt', 's')" not in normalized
 

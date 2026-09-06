@@ -98,6 +98,13 @@ def test_B_primary_timeout_then_fallback_succeeds_same_screenshot():
     fallback_call_args = fallback.analyze_screen.call_args
     assert primary_call_args[0][0] == shot
     assert fallback_call_args[0][0] == shot
+    # 2026-09-06 diagnostics addition: stage is passed through to BOTH
+    # calls as a kwarg (so provider-level diagnostic logging, e.g.
+    # AnthropicProvider's ANTHROPIC_RESPONSE_METADATA, can be attributed
+    # to the right stage) — purely additive, never changes what the
+    # provider is asked to do.
+    assert primary_call_args.kwargs["stage"] == "TEST_STAGE"
+    assert fallback_call_args.kwargs["stage"] == "TEST_STAGE"
 
 
 def test_C_primary_rate_limited_then_fallback_succeeds():
@@ -163,6 +170,83 @@ def test_F_primary_schema_invalid_json_triggers_fallback():
     primary = _provider("anthropic")
     # Valid JSON, but doesn't match _DummyResponse's types at all —
     # ValidationError, not a raised VisionProviderError.
+    primary.analyze_screen.return_value = _call(parsed_json={"candidate_count": "not-a-number"})
+    fallback = _provider("gemini")
+    fallback.analyze_screen.return_value = _call({"target_visible": True})
+
+    service = VisionService(primary, fallback, default_max_retries=0)
+    outcome = service.analyze(_request())
+
+    assert outcome.parsed is not None
+    assert outcome.provider_used == "gemini"
+    assert outcome.fallback_used is True
+
+
+class _RequiredFieldResponse(BaseModel):
+    """A stand-in schema with a REQUIRED field (no default) — _DummyResponse
+    above has none, so it can't exercise the 'missing_fields' diagnostic."""
+
+    must_be_present: str
+    confidence: float = 0.0
+
+
+def test_schema_validation_failure_logs_diagnostics_without_raw_content(caplog):
+    """2026-09-06: safe diagnostics for WHY a response failed schema
+    validation — never the raw response content itself."""
+    primary = _provider("anthropic")
+    primary.analyze_screen.return_value = _call(parsed_json={"candidate_count": "not-a-number-xyz123"})
+    service = VisionService(primary, fallback=None, default_max_retries=0)
+
+    with caplog.at_level("INFO", logger="app.vision.service"):
+        outcome = service.analyze(_request())
+
+    assert outcome.parsed is None
+    messages = [r.getMessage() for r in caplog.records]
+    diag_lines = [m for m in messages if "VISION_SCHEMA_VALIDATION_FAILED" in m]
+    assert len(diag_lines) == 1
+    assert "stage=TEST_STAGE" in diag_lines[0]
+    assert "provider=anthropic" in diag_lines[0]
+    assert "json_parse_failed=False" in diag_lines[0]
+    assert "response_char_count=" in diag_lines[0]
+    # Never the actual (possibly sensitive) field value itself.
+    assert "not-a-number-xyz123" not in diag_lines[0]
+
+
+def test_schema_validation_failure_reports_missing_required_field_names(caplog):
+    primary = _provider("anthropic")
+    primary.analyze_screen.return_value = _call(parsed_json={"confidence": 0.9})  # must_be_present omitted
+    service = VisionService(primary, fallback=None, default_max_retries=0)
+
+    with caplog.at_level("INFO", logger="app.vision.service"):
+        outcome = service.analyze(_request(response_model=_RequiredFieldResponse))
+
+    assert outcome.parsed is None
+    assert outcome.schema_invalid is True
+    diag_lines = [r.getMessage() for r in caplog.records if "VISION_SCHEMA_VALIDATION_FAILED" in r.getMessage()]
+    assert len(diag_lines) == 1
+    assert "must_be_present" in diag_lines[0]
+    assert "validation_error_type=ValidationError" in diag_lines[0]
+
+
+def test_schema_validation_failure_json_parse_failed_when_no_json(caplog):
+    primary = _provider("anthropic")
+    primary.analyze_screen.return_value = _call(parsed_json=None)
+    service = VisionService(primary, fallback=None, default_max_retries=0)
+
+    with caplog.at_level("INFO", logger="app.vision.service"):
+        service.analyze(_request())
+
+    diag_lines = [r.getMessage() for r in caplog.records if "VISION_SCHEMA_VALIDATION_FAILED" in r.getMessage()]
+    assert len(diag_lines) == 1
+    assert "json_parse_failed=True" in diag_lines[0]
+    assert "validation_error_type=None" in diag_lines[0]
+    assert "missing_fields=[]" in diag_lines[0]
+
+
+def test_schema_validation_diagnostic_logging_never_changes_fallback_outcome():
+    """Purely additive: the diagnostic log must not alter which provider
+    ultimately answers or whether fallback triggers."""
+    primary = _provider("anthropic")
     primary.analyze_screen.return_value = _call(parsed_json={"candidate_count": "not-a-number"})
     fallback = _provider("gemini")
     fallback.analyze_screen.return_value = _call({"target_visible": True})

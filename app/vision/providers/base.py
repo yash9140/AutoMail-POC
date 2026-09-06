@@ -64,15 +64,30 @@ class ProviderCallResult:
     latency_ms: float
     input_tokens: Optional[int]
     output_tokens: Optional[int]
+    # SDK-reported termination reason (2026-09-06 REPLY_SEARCH structured-
+    # output diagnostics), e.g. Anthropic's "end_turn" | "max_tokens" |
+    # "stop_sequence" | "tool_use". None for a provider/SDK version that
+    # doesn't expose one (e.g. this field is currently populated only by
+    # AnthropicProvider) — never fabricated, never inferred.
+    stop_reason: Optional[str] = None
 
 
 class VisionProvider(ABC):
     provider_name: str
 
     @abstractmethod
-    def analyze_screen(self, image_path: Path, goal: str, prompt_text: str) -> ProviderCallResult:
+    def analyze_screen(self, image_path: Path, goal: str, prompt_text: str, stage: str = "") -> ProviderCallResult:
         """Send image_path + prompt_text (which already embeds the goal and image
         dimensions) to the provider and return the raw result.
+
+        stage (2026-09-06, diagnostics-only addition) is the same stage tag
+        app/fallback/recovery.py's VISION_CALL_* logging already uses (e.g.
+        "REPLY_SEARCH") — passed through so provider-level diagnostic
+        logging (currently: AnthropicProvider's ANTHROPIC_RESPONSE_METADATA/
+        ANTHROPIC_JSON_STRUCTURE_DIAGNOSTICS) can be attributed to the right
+        stage without the provider needing to know anything else about the
+        business flow. Purely optional/additive — never read by any
+        decision path, never changes retry/fallback/validation behavior.
 
         Must raise one of the VisionProviderError subclasses above on failure —
         never let a raw SDK exception escape uncaught.

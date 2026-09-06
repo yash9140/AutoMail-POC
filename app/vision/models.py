@@ -198,6 +198,77 @@ class EmailSearchResponse(BaseModel):
     reason: str = ""
 
 
+class EmailRowBBoxRefinementResponse(BaseModel):
+    """Second-pass, SAME-screenshot, row-bbox-ONLY refinement (2026-09-06)
+    — see app/outlook/find_email.py::_refine_row_bbox()'s docstring.
+
+    The candidate's IDENTITY (sender, subject, which row) was already
+    deterministically accepted by the playbook BEFORE this call is ever
+    made — this request never re-asks Vision to search the inbox, choose
+    a different candidate, or reconsider identity, and this response
+    never carries sender/subject fields at all (there is nothing for the
+    playbook to re-check there; only the geometry was ever in question).
+    It asks ONLY for a tighter row_bbox for that exact, already-
+    identified email row, or an honest "still can't confidently localize
+    it" (target_visible=false) — never a fabricated/guessed box.
+
+    Deliberately minimal and NOT a duplicate of EmailSearchResponse/
+    EmailCandidate — no candidate list, no ambiguity handling, no
+    sender/subject/date fields. app.safety.validators.validate_email_row_
+    bbox() — the SAME validator used for the original bbox, never a
+    separate/weaker one — is what ultimately decides whether row_bbox
+    here is safe to click."""
+
+    target_visible: bool = False
+    row_bbox: Optional[list[float]] = None  # [y_min, x_min, y_max, x_max], 0-1000 normalized
+    confidence: float = 0.0
+    reason: str = ""
+
+    @field_validator("confidence")
+    @classmethod
+    def confidence_in_range(cls, v: float) -> float:
+        if not (0.0 <= v <= 1.0):
+            raise ValueError(f"confidence {v} is outside the valid range [0.0, 1.0]")
+        return v
+
+
+class EmailRowIdentityRefinementResponse(BaseModel):
+    """Bounded, SAME-screenshot IDENTITY-AWARE row-grounding refinement
+    (2026-09-06) — see app/outlook/find_email.py::_refine_row_identity()'s
+    docstring. Distinct from EmailRowBBoxRefinementResponse (geometry-
+    only tightening of an ALREADY-TRUSTED row): this call exists because
+    a live run showed Vision correctly identify a candidate's sender and
+    (truncated) subject text, yet attach a row_bbox belonging to a
+    DIFFERENT row from the same sender — the bbox alone can silently
+    drift onto the wrong row when several rows share a sender, and
+    geometry validation cannot detect that (a wrong-row bbox can still
+    be a perfectly plausible message-list row shape).
+
+    This response carries grounded_sender/grounded_subject — the
+    sender/subject text Vision actually observes INSIDE the returned
+    row_bbox — specifically so deterministic Python can independently
+    re-verify that the bbox belongs to the same sender+subject as the
+    already-accepted candidate, never trusting the bbox on its own. Not
+    a re-decision of business identity: this call never re-searches the
+    inbox, never switches sender, and never chooses among ambiguous
+    candidates itself — it grounds ONE already-specified sender+subject
+    to its own exact row, or reports an honest "can't confirm"
+    (row_bbox=None) — never a fabricated/guessed box."""
+
+    grounded_sender: str = ""
+    grounded_subject: str = ""
+    row_bbox: Optional[list[float]] = None  # [y_min, x_min, y_max, x_max], 0-1000 normalized
+    confidence: float = 0.0
+    reason: str = ""
+
+    @field_validator("confidence")
+    @classmethod
+    def confidence_in_range(cls, v: float) -> float:
+        if not (0.0 <= v <= 1.0):
+            raise ValueError(f"confidence {v} is outside the valid range [0.0, 1.0]")
+        return v
+
+
 class ReplySearchResponse(BaseModel):
     """Structured, provider-neutral Reply-control search result (Phase
     5). Vision reports the ONE control it believes is Reply (if any) —
@@ -250,6 +321,48 @@ class SendSearchResponse(BaseModel):
         return v
 
 
+class ComposerActionBarLocalizationResponse(BaseModel):
+    """SEND_COMPOSER_LOCALIZATION — coarse, REGION-ONLY structural
+    localization of the reply composer's action bar (2026-09-06). See
+    benchmarks/claude/experiments/run_dynamic_send_grounding_experiment.py
+    for the static evidence this is based on: full-screen and reading-
+    pane-crop exact-Send bbox grounding were both spatially unreliable
+    (landing right at/just past the boundary between the primary Send
+    button and its own adjacent dropdown chevron), while a tight crop
+    around the composer's action-bar ROW was reliable — and that tight
+    crop can be derived deterministically from THIS response's own
+    action_bar_bbox rather than a hand-measured pixel box.
+
+    action_bar_bbox is deliberately a whole CONTROL-ROW region (Send +
+    its dropdown + Discard, whichever are visibly part of that row) —
+    NEVER a single button, and NEVER directly actionable. It exists
+    ONLY to let deterministic Python derive a tighter Stage-2 crop for
+    the SEPARATE, already-proven exact-Send grounding request
+    (SendSearchResponse, above) — see app/outlook/send.py::
+    ground_and_click_send(). Even if this response's own reason/labels
+    happen to mention Send, its bbox must never be used for physical
+    action; only Stage 2's own SendSearchResponse.bbox may become
+    actionable.
+
+    composer_bbox is optional, looser diagnostic-only context (the
+    whole composer pane) — never itself used to derive the Stage-2
+    crop."""
+
+    composer_visible: bool = False
+    action_bar_visible: bool = False
+    action_bar_bbox: Optional[list[float]] = None  # [y_min, x_min, y_max, x_max], 0-1000 normalized, relative to the reading-pane crop
+    composer_bbox: Optional[list[float]] = None  # optional, looser whole-composer box — diagnostics only, never used for cropping
+    confidence: float = 0.0
+    reason: str = ""
+
+    @field_validator("confidence")
+    @classmethod
+    def confidence_in_range(cls, v: float) -> float:
+        if not (0.0 <= v <= 1.0):
+            raise ValueError(f"confidence {v} is outside the valid range [0.0, 1.0]")
+        return v
+
+
 class EmailSectionExtractionResponse(BaseModel):
     """Raw Vision response for the EXTRACTION half of one email-body
     section read (2026-09-04 latency fix). The original single-call
@@ -280,9 +393,40 @@ class EmailSectionExtractionResponse(BaseModel):
     true end of a long email was ever seen). content_complete is NEVER
     read directly from Vision; app/outlook/read_email.py computes it
     deterministically as `(not more_content_below) AND
-    end_of_message_visible` — requiring BOTH signals to agree is a
-    strictly stronger bar than trusting either alone, and avoids a
-    second, possibly-conflicting source of truth for completion."""
+    (end_of_message_visible OR conversation_history_visible_below)` —
+    see conversation_history_visible_below below for why the OR was
+    added (2026-09-06 threaded-conversation fix).
+
+    Both fields are scoped to the CURRENT TARGET MESSAGE specifically,
+    never the whole Outlook conversation thread:
+    - more_content_below asks "does THIS message's own body continue
+      below" — a different conversation/thread item appearing below is
+      NOT this message continuing, so it must NOT make this true.
+    - end_of_message_visible asks "is genuine trailing blank space or an
+      exhausted scrollbar visible" — unchanged, strict, unrelated to
+      thread structure.
+
+    conversation_history_visible_below (2026-09-06 threaded-conversation
+    fix): true when a STRUCTURALLY DISTINCT next conversation/thread
+    item — a different message card, a different sender's name/avatar,
+    a new timestamp header, or a "N earlier messages" collapsed-history
+    indicator — is visible immediately below the current target
+    message's content. Outlook's threaded-conversation view was being
+    misread: a live run had a short, complete target message correctly
+    followed by a separate historical reply card, and the reader
+    confused "there is another conversation item below" with "the
+    current message continues below," scrolling three times before
+    safe-stopping as CONTENT_NOT_FULLY_READ on an email that was
+    actually already fully read. When this is true (and
+    more_content_below is false), the current target message is treated
+    as complete even if end_of_message_visible itself is false — seeing
+    a distinct next thread item IS positive structural evidence that
+    THIS message ended, which the original end_of_message_visible
+    definition (blank space / exhausted scrollbar only) never accounted
+    for. Never inferred from a signature, "Thanks"/"Regards", the
+    presence of Reply, or "enough" content having been read — same
+    forbidden-reasons discipline as end_of_message_visible already
+    enforces, extended to this field too."""
 
     extracted_visible_content: str = ""
     overlap_text: str = ""
@@ -293,6 +437,7 @@ class EmailSectionExtractionResponse(BaseModel):
     commitments: list[str] = Field(default_factory=list)
     more_content_below: bool = False
     end_of_message_visible: bool = False
+    conversation_history_visible_below: bool = False
     no_new_content: bool = False
     confidence: float = 0.0
     reason: str = ""
@@ -352,6 +497,12 @@ class EmailSection(BaseModel):
     overlap_with_previous: Optional[str] = None
     more_content_below: bool = False
     end_of_message_visible: bool = False
+    # True when a structurally distinct next conversation/thread item is
+    # visible below the current target message — see
+    # EmailSectionExtractionResponse's docstring (2026-09-06 threaded-
+    # conversation fix). Used alongside end_of_message_visible in
+    # read_email.py's completion decision; never on its own.
+    conversation_history_visible_below: bool = False
     no_new_content: bool = False  # true when a scroll produced zero new text vs. the accumulated tail
     reply_expectation: str = ReplyExpectation.OPTIONAL_REPLY
     requires_user_decision: bool = False

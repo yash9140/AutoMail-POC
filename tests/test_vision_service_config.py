@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.config import settings  # noqa: E402
 from app.vision import service as vision_service  # noqa: E402
 
 
@@ -27,6 +28,14 @@ def _isolate_env(monkeypatch, tmp_path) -> None:
     empty_env = tmp_path / ".env"
     empty_env.write_text("", encoding="utf-8")
     monkeypatch.setattr(vision_service, "PROJECT_ROOT", tmp_path)
+    # get_primary_vision_provider_name()'s backward-compat fallback calls
+    # settings.get_ai_provider_name(), which does its OWN load_dotenv()
+    # against settings.PROJECT_ROOT — must be isolated too, or a real
+    # .env sitting next to this repo (which legitimately has
+    # PRIMARY_VISION_PROVIDER/FALLBACK_VISION_PROVIDER set) leaks in via
+    # dotenv's "don't override an already-set var, but do set unset ones"
+    # default behavior.
+    monkeypatch.setattr(settings, "PROJECT_ROOT", tmp_path)
 
 
 # --- Backward compatibility: only AI_PROVIDER set ---

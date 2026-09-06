@@ -14,6 +14,7 @@ from app.outlook.find_email import TARGET_EMAIL_SENDER, TARGET_EMAIL_SUBJECT  # 
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.service import VisionService  # noqa: E402
 from app.workers.find_open_email_worker import FindOpenEmailWorker  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 STEPS_MODULE = "app.outlook.find_email"
 LAUNCH_MODULE = "app.outlook.launch"
@@ -43,7 +44,7 @@ def _email_grounding():
             "candidate_count": 1,
             "candidates": [{
                 "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "date_or_order": "Today",
-                "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+                "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
             }],
             "more_content_below": False, "reason": "ok",
         },
@@ -91,10 +92,8 @@ def test_bounded_approval_true_runs_end_to_end_to_success():
          patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345), \
          patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True), \
          patch(f"{LAUNCH_MODULE}.maximize") as mock_maximize, \
-         patch(f"{LAUNCH_MODULE}.get_environment_info",
-               return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True}), \
          patch(f"{LAUNCH_MODULE}.capture_screen", return_value=MagicMock(filename="x.png", path="x.png", width=1920, height=1080)), \
-         patch(f"{STEPS_MODULE}.capture_screen", return_value=MagicMock(filename="y.png", path="y.png", width=1920, height=1080)):
+         patch(f"{STEPS_MODULE}.capture_screen", return_value=MagicMock(filename="y.png", path=real_capture_image_path(1920, 1080, name="y.png"), width=1920, height=1080)):
         mock_launch_pyautogui.FAILSAFE = True
         mock_email_pyautogui.FAILSAFE = True
         worker.run()
@@ -165,10 +164,8 @@ def test_target_email_not_visible_stops_after_bounded_scroll():
          patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345), \
          patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True), \
          patch(f"{LAUNCH_MODULE}.maximize"), \
-         patch(f"{LAUNCH_MODULE}.get_environment_info",
-               return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True}), \
          patch(f"{LAUNCH_MODULE}.capture_screen", return_value=MagicMock(filename="x.png", path="x.png", width=1920, height=1080)), \
-         patch(f"{STEPS_MODULE}.capture_screen", return_value=MagicMock(filename="y.png", path="y.png", width=1920, height=1080)):
+         patch(f"{STEPS_MODULE}.capture_screen", return_value=MagicMock(filename="y.png", path=real_capture_image_path(1920, 1080, name="y.png"), width=1920, height=1080)):
         mock_launch_pyautogui.FAILSAFE = True
         mock_email_pyautogui.FAILSAFE = True
         mock_scroll_pyautogui.FAILSAFE = True

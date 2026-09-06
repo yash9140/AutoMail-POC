@@ -22,6 +22,7 @@ from app.outlook.find_email import FindOpenEmailSteps  # noqa: E402
 from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.service import VisionService  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 MODULE = "app.outlook.find_email"
 
@@ -35,10 +36,10 @@ def _steps(target_sender: str = "Yash", target_subject: str = "Mail for project"
     return steps
 
 
-def _candidate(sender: str, subject: str, bbox=(400.0, 100.0, 440.0, 900.0), confidence=0.9, date="Today",
+def _candidate(sender: str, subject: str, bbox=(400.0, 100.0, 440.0, 480.0), confidence=0.9, date="Today",
                 subject_truncated: bool = False):
     return {"sender": sender, "subject": subject, "subject_truncated": subject_truncated, "date_or_order": date,
-            "row_bbox": list(bbox), "confidence": confidence}
+            "row_bbox": to_crop_relative_bbox(list(bbox)), "confidence": confidence}
 
 
 def _verify_call(subject_detected: str, sender_detected: str, subject_match: bool = True, sender_match: bool = True,
@@ -68,22 +69,38 @@ def _search_call(candidates: list[dict], target_visible: bool = True):
 
 
 def _capture(width=1920, height=1080, filename="inbox.png"):
-    return MagicMock(filename=filename, path=filename, width=width, height=height)
+    return MagicMock(filename=filename, path=real_capture_image_path(width, height), width=width, height=height)
 
 
-def _run(steps: FindOpenEmailSteps, call):
+def _identity_refine_call(sender, subject, row_bbox, confidence=0.95):
+    return MagicMock(
+        parsed_json={"grounded_sender": sender, "grounded_subject": subject,
+                     "row_bbox": to_crop_relative_bbox(list(row_bbox)), "confidence": confidence, "reason": "ok"},
+        raw_text="{}", model="gemini-3.6-flash", latency_ms=80.0, input_tokens=10, output_tokens=5,
+    )
+
+
+def _run(steps: FindOpenEmailSteps, call, extra_calls=None):
     """Runs find_target_email() with every external dependency mocked.
     Returns (result_bool, mock_pyautogui) so callers can assert zero
     physical clicks on a rejected/ineligible outcome — find_target_email()
     itself never clicks (that's the separate click_target_email() method),
-    so this also structurally proves matching alone gates the click."""
+    so this also structurally proves matching alone gates the click.
+
+    extra_calls, if given, is appended after `call` as a side_effect
+    sequence — for scenarios (multiple same-sender rows, a provisional
+    match, low confidence) that make the 2026-09-06 identity-row
+    refinement eligible and need their own mocked response."""
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Inbox - Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.scroll_message_list") as mock_scroll, \
          patch(f"{MODULE}.time.sleep"), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
         mock_pyautogui.FAILSAFE = True
-        steps.vision.primary.analyze_screen.return_value = call
+        if extra_calls:
+            steps.vision.primary.analyze_screen.side_effect = [call, *extra_calls]
+        else:
+            steps.vision.primary.analyze_screen.return_value = call
         result = steps.find_target_email()
     return result, mock_pyautogui, mock_scroll
 
@@ -97,7 +114,10 @@ def test_only_exact_sender_and_subject_candidate_is_eligible_and_found():
         _candidate("Yash Dhanraj", "Important Update Regarding Current Work and Next Steps"),
         _candidate("Yash", "Mail for project"),
     ]
-    result, mock_pyautogui, _ = _run(steps, _search_call(candidates))
+    result, mock_pyautogui, _ = _run(
+        steps, _search_call(candidates),
+        extra_calls=[_identity_refine_call("Yash", "Mail for project", (400.0, 100.0, 440.0, 480.0))],
+    )
     assert result is True
     mock_pyautogui.click.assert_not_called()  # find_target_email() itself never clicks
     assert steps.result.email_candidate_count == 1
@@ -148,7 +168,10 @@ def test_multiple_sender_matches_exact_pair_wins():
         _candidate("Yash", "Another unrelated subject"),
         _candidate("Yash", "Mail for project"),
     ]
-    result, mock_pyautogui, _ = _run(steps, _search_call(candidates))
+    result, mock_pyautogui, _ = _run(
+        steps, _search_call(candidates),
+        extra_calls=[_identity_refine_call("Yash", "Mail for project", (400.0, 100.0, 440.0, 480.0))],
+    )
     assert result is True
     assert steps.result.email_candidate_count == 1
     mock_pyautogui.click.assert_not_called()
@@ -241,20 +264,28 @@ TRUNCATION_TARGET_SUBJECT = "Important Update Regarding Current Work and Next St
 TRUNCATION_TARGET_SENDER = "Yash Dhanraj"
 
 
-def _run_find_click_verify(steps: FindOpenEmailSteps, search_call, verify_call):
+def _run_find_click_verify(steps: FindOpenEmailSteps, search_call, verify_call, identity_call=None):
     """find_target_email() -> click_target_email() -> verify_email_opened(),
     all mocked, in one call — for the provisional-match tests, which need
     the FULL flow (a provisional match is only ever confirmed post-open).
     verify_call is supplied for every bounded verification attempt (up to
     MAX_EMAIL_OPEN_VERIFICATION_ATTEMPTS) — on a genuine mismatch, both
     attempts see the same (still-mismatched) detected text, exactly as a
-    real unchanged-but-wrong open email would."""
+    real unchanged-but-wrong open email would.
+
+    identity_call: a provisional (truncated-subject) match always makes
+    the 2026-09-06 identity-row refinement eligible — every caller of
+    this helper passes one, inserted right after search_call."""
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Inbox - Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.time.sleep"), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
         mock_pyautogui.FAILSAFE = True
-        steps.vision.primary.analyze_screen.side_effect = [search_call, verify_call, verify_call]
+        calls = [search_call]
+        if identity_call is not None:
+            calls.append(identity_call)
+        calls.extend([verify_call, verify_call])
+        steps.vision.primary.analyze_screen.side_effect = calls
         found = steps.find_target_email()
         if not found:
             return found, False, False, mock_pyautogui
@@ -270,8 +301,11 @@ def test_A_truncated_prefix_provisional_match_confirmed_after_open():
     candidates = [_candidate(TRUNCATION_TARGET_SENDER, "Important Update Regardi...", subject_truncated=True)]
     search_call = _search_call(candidates)
     verify_call = _verify_call(TRUNCATION_TARGET_SUBJECT, TRUNCATION_TARGET_SENDER)
+    identity_call = _identity_refine_call(
+        TRUNCATION_TARGET_SENDER, "Important Update Regardi...", (400.0, 100.0, 440.0, 480.0),
+    )
 
-    found, clicked, verified, mock_pyautogui = _run_find_click_verify(steps, search_call, verify_call)
+    found, clicked, verified, mock_pyautogui = _run_find_click_verify(steps, search_call, verify_call, identity_call)
 
     assert found is True
     assert steps.result.provisional_match is True
@@ -330,8 +364,11 @@ def test_D_provisional_match_rejected_after_open_on_full_subject_mismatch():
         "Important Update Regarding A Completely Different Topic", TRUNCATION_TARGET_SENDER,
         subject_match=True, sender_match=True,
     )
+    identity_call = _identity_refine_call(
+        TRUNCATION_TARGET_SENDER, "Important Update Regardi...", (400.0, 100.0, 440.0, 480.0),
+    )
 
-    found, clicked, verified, mock_pyautogui = _run_find_click_verify(steps, search_call, verify_call)
+    found, clicked, verified, mock_pyautogui = _run_find_click_verify(steps, search_call, verify_call, identity_call)
 
     assert found is True
     assert clicked is True
@@ -405,6 +442,11 @@ def test_H_case_and_whitespace_differences_still_match():
     candidates_prefix = [_candidate(
         "YASH DHANRAJ", "Important   Update  Regardi...", subject_truncated=True,
     )]
-    result_prefix, _, _ = _run(steps_prefix, _search_call(candidates_prefix))
+    result_prefix, _, _ = _run(
+        steps_prefix, _search_call(candidates_prefix),
+        extra_calls=[_identity_refine_call(
+            "YASH DHANRAJ", "Important   Update  Regardi...", (400.0, 100.0, 440.0, 480.0),
+        )],
+    )
     assert result_prefix is True
     assert steps_prefix.result.candidate_match_log[0].match_type == "provisional"

@@ -342,8 +342,9 @@ def test_launch_module_has_no_email_reply_type_or_send_methods():
 def test_launch_module_pyautogui_usage_unchanged_by_maximize_addition():
     """Structural: enforce_maximized() adds zero new pyautogui call
     sites — maximize is ctypes-only. The module's total pyautogui
-    surface area (Windows-key press, one write, one moveTo, one click)
-    stays exactly what Phase 1 already proved."""
+    surface area (Windows-key press, one write, one Enter-key
+    activation press, zero mouse move/click — 2026-09-06 keyboard-
+    activation fix) stays exactly what the launch stage already proved."""
     import inspect
 
     from app.outlook import launch as launch_mod
@@ -352,5 +353,6 @@ def test_launch_module_pyautogui_usage_unchanged_by_maximize_addition():
     normalized = source.replace('"', "'")
     assert normalized.count("pyautogui.press('win')") == 1
     assert normalized.count("pyautogui.write(") == 1
-    assert source.count("pyautogui.moveTo(") == 1
-    assert normalized.count("pyautogui.click()") == 1
+    assert normalized.count("pyautogui.press('enter')") == 1
+    assert source.count("pyautogui.moveTo(") == 0
+    assert normalized.count("pyautogui.click()") == 0

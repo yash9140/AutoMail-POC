@@ -44,7 +44,11 @@ class GeminiProvider(VisionProvider):
         self.timeout_seconds = timeout_seconds
         self._client = genai.Client(api_key=api_key)
 
-    def analyze_screen(self, image_path: Path, goal: str, prompt_text: str) -> ProviderCallResult:
+    def analyze_screen(self, image_path: Path, goal: str, prompt_text: str, stage: str = "") -> ProviderCallResult:
+        # stage is accepted for VisionProvider interface parity (see
+        # base.py) but not yet used — Gemini's SDK response doesn't expose
+        # an Anthropic-style stop_reason today, so there is nothing
+        # stage-tagged to log here yet.
         image_path = Path(image_path)
         image_bytes = image_path.read_bytes()
 

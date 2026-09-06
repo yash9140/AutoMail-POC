@@ -136,6 +136,37 @@ def _validate(response_model: Type[T], parsed_json: Optional[dict]) -> Optional[
         return None
 
 
+def _log_schema_validation_failure(
+    stage: str, provider_name: str, response_model: Type[T], parsed_json: Optional[dict], raw_text: Optional[str],
+) -> None:
+    """Diagnostics-only (2026-09-06): explains WHY a response failed
+    schema validation, without ever logging raw model output/email/
+    screen content. missing_fields lists only FIELD NAMES declared on
+    response_model (already-public application schema knowledge, never
+    data drawn from the response body itself). Purely additive logging —
+    never changes _validate()'s pass/fail outcome or any caller's
+    control flow."""
+    json_parse_failed = not parsed_json
+    validation_error_type: Optional[str] = None
+    missing_fields: list[str] = []
+    if not json_parse_failed:
+        try:
+            response_model.model_validate(parsed_json)
+        except ValidationError as exc:
+            validation_error_type = type(exc).__name__
+            for err in exc.errors():
+                if err.get("type") == "missing":
+                    loc = err.get("loc", ())
+                    if loc:
+                        missing_fields.append(str(loc[-1]))
+    _service_logger.info(
+        "VISION_SCHEMA_VALIDATION_FAILED stage=%s provider=%s validation_error_type=%s "
+        "missing_fields=%s json_parse_failed=%s response_char_count=%s",
+        stage, provider_name, validation_error_type, missing_fields, json_parse_failed,
+        len(raw_text) if raw_text is not None else None,
+    )
+
+
 class VisionService:
     """Owns exactly one primary VisionProvider and an optional fallback
     VisionProvider. Constructed once per run in the composition root
@@ -167,7 +198,9 @@ class VisionService:
         effective_max_retries = self.default_max_retries if max_retries is None else max_retries
 
         primary_outcome = call_with_provider_retry(
-            lambda: self.primary.analyze_screen(request.screenshot_path, request.goal, request.prompt_text),
+            lambda: self.primary.analyze_screen(
+                request.screenshot_path, request.goal, request.prompt_text, stage=request.stage,
+            ),
             stage=request.stage, provider_name=self.primary.provider_name, max_retries=effective_max_retries,
         )
         self.primary_calls += 1
@@ -180,6 +213,10 @@ class VisionService:
             if primary_parsed is None:
                 primary_error = "Primary provider response was not schema-valid."
                 primary_schema_invalid = True
+                _log_schema_validation_failure(
+                    request.stage, self.primary.provider_name, request.response_model,
+                    primary_outcome.result.parsed_json, primary_outcome.result.raw_text,
+                )
 
         if primary_parsed is not None:
             call = primary_outcome.result
@@ -215,7 +252,9 @@ class VisionService:
             request.stage, self.primary.provider_name, self.fallback.provider_name, primary_error,
         )
         fallback_outcome = call_with_provider_retry(
-            lambda: self.fallback.analyze_screen(request.screenshot_path, request.goal, request.prompt_text),
+            lambda: self.fallback.analyze_screen(
+                request.screenshot_path, request.goal, request.prompt_text, stage=request.stage,
+            ),
             stage=request.stage, provider_name=self.fallback.provider_name, max_retries=0,
         )
         self.fallback_calls += 1
@@ -228,6 +267,10 @@ class VisionService:
             if fallback_parsed is None:
                 fallback_error = "Fallback provider response was not schema-valid."
                 fallback_schema_invalid = True
+                _log_schema_validation_failure(
+                    request.stage, self.fallback.provider_name, request.response_model,
+                    fallback_outcome.result.parsed_json, fallback_outcome.result.raw_text,
+                )
 
         if fallback_parsed is not None:
             call = fallback_outcome.result

@@ -41,6 +41,21 @@ Analyze only what is visually present in this screenshot. Do not
 assume Reply is present if you cannot actually see it. Do not invent a
 match.
 
+This is a VISUAL GROUNDING task only — report only the Reply control's
+identity/location. Do not describe the email body, the sender's
+request, the conversation history, or why replying is appropriate; do
+not enumerate unrelated toolbar/navigation controls that are not
+plausibly confusable with Reply.
+
+OUTPUT RULES — keep the response compact and strictly valid JSON:
+1. Return ONLY the JSON object below — no markdown, no ``` code fences,
+   no prose or explanation before or after it, and no chain-of-thought.
+2. control_identity/control_type must be the exact visible label/kind,
+   copied verbatim once — never paraphrased, never repeated elsewhere.
+3. Keep the "reason" field to one short factual phrase (10 words or
+   fewer) — it is for audit logging, not an explanation of your
+   reasoning.
+
 Return ONLY the following structured JSON, with no other text before
 or after it:
 

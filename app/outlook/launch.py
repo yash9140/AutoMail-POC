@@ -17,7 +17,6 @@ via AbortController before the corresponding action, never after.
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import time
 from datetime import datetime
@@ -33,12 +32,10 @@ from app.automation.screen_capture import (  # noqa: E402
     DEFAULT_OUTPUT_DIR,
     ScreenCaptureError,
     capture_screen,
-    get_environment_info,
 )
 from app.config.settings import (  # noqa: E402
     MAX_READINESS_ATTEMPTS,
     MAXIMIZE_STABILIZE_WAIT_SECONDS,
-    MOVE_DURATION_SECONDS,
     OUTLOOK_LAUNCH_INITIAL_WAIT_SECONDS,
     OUTLOOK_LAUNCH_POLL_INTERVAL_SECONDS,
     OUTLOOK_LAUNCH_TIMEOUT_SECONDS,
@@ -60,9 +57,6 @@ from app.safety.foreground import (  # noqa: E402
     is_search_state_foreground,
     maximize,
 )
-from app.safety.validators import GroundingCheckFailure, validate_grounding  # noqa: E402
-from app.vision.debug_overlay import save_grounding_debug_artifact  # noqa: E402
-from app.vision.grounding import normalize_1000_to_pixels  # noqa: E402
 from app.vision.models import OutlookSearchGroundingResponse, OutlookSearchRefineResponse  # noqa: E402
 from app.vision.service import VisionRequest, VisionService, get_vision_service  # noqa: E402
 from rnd.models.outlook_launch import (  # noqa: E402
@@ -73,18 +67,17 @@ from rnd.models.outlook_launch import (  # noqa: E402
 )
 
 PROMPTS_DIR = PROJECT_ROOT / "rnd" / "prompts"
-# OUTLOOK_SEARCH — bbox + semantic-classification + tightness-self-check
-# + bounded refine-pass, used for BOTH providers (primary or fallback)
-# since the 2026-09-05 provider-architecture unification — see
-# ground_search_result()'s docstring for why this used to be two
-# separate prompts/schemas and no longer is. The historical Gemini-only
-# loose-point prompt (rnd/prompts/windows_search_grounding_v1.txt) is
-# left in place, frozen, simply no longer referenced here.
+# OUTLOOK_SEARCH — semantic verification ONLY (2026-09-06 keyboard-
+# activation fix; see ground_search_result()'s docstring). Used
+# identically for both providers (primary or fallback). bbox is still
+# in the response schema/logged for diagnostics but never drives a
+# physical action for this stage anymore — see activate_outlook_result().
+# The historical Gemini-only loose-point prompt (rnd/prompts/
+# windows_search_grounding_v1.txt) and the historical bbox-refine prompt
+# (app/vision/prompts/outlook_search_grounding_refine_v1.txt) are left
+# in place, frozen, simply no longer referenced here.
 WINDOWS_SEARCH_GROUNDING_PROMPT_PATH = (
     PROJECT_ROOT / "app" / "vision" / "prompts" / "outlook_search_grounding_v1.txt"
-)
-OUTLOOK_SEARCH_REFINE_PROMPT_PATH = (
-    PROJECT_ROOT / "app" / "vision" / "prompts" / "outlook_search_grounding_refine_v1.txt"
 )
 OUTLOOK_LAUNCH_VERIFICATION_PROMPT_PATH = PROMPTS_DIR / "outlook_launch_verification_v1.txt"
 
@@ -92,28 +85,10 @@ OUTLOOK_LAUNCH_VERIFICATION_PROMPT_PATH = PROMPTS_DIR / "outlook_launch_verifica
 # so existing call sites/tests that reference this name keep working.
 GROUNDING_CONFIDENCE_THRESHOLD = VISION_CONFIDENCE_THRESHOLD
 
-# A single clickable search-result row can never legitimately span this
-# much of the screenshot in BOTH width and height at once — a
-# resolution-independent, layout-independent (normalized 0-1000) sanity
-# bound, not a screen-specific threshold. See ground_search_result()'s
-# oversized-bbox check for the full reasoning on why this is
-# deliberately narrow (only the "whole screen/panel" extreme).
-MAX_PLAUSIBLE_RESULT_BBOX_NORMALIZED_SPAN = 950.0
-
 # Vision-call stage identifiers (app/fallback/recovery.py structured
 # logging) for this module's calls.
 STAGE_OUTLOOK_SEARCH = "OUTLOOK_SEARCH"
-# The optional, bounded, SAME-screenshot second pass — a distinct stage
-# tag so its own VISION_CALL_*/provider-retry logging is never confused
-# with the first pass in diagnostics. See ground_search_result().
-STAGE_OUTLOOK_SEARCH_REFINE = "OUTLOOK_SEARCH_REFINE"
 STAGE_OUTLOOK_READINESS = "OUTLOOK_READINESS"
-
-# Diagnostic-only, opt-in: set OUTLOOK_GROUNDING_DEBUG=1 to save a
-# debug/outlook_search_grounding_<timestamp>.png overlay artifact per
-# grounding attempt. Never enabled by default; never a runtime click
-# source (see app/vision/debug_overlay.py).
-_DEBUG_ARTIFACTS_ENABLED = os.environ.get("OUTLOOK_GROUNDING_DEBUG") == "1"
 
 _grounding_logger = logging.getLogger("app.outlook.launch.grounding")
 if not _grounding_logger.handlers:
@@ -123,23 +98,6 @@ if not _grounding_logger.handlers:
     _grounding_logger.setLevel(logging.INFO)
     _grounding_logger.propagate = False
 
-# Maps app.safety.validators.GroundingCheckFailure to this module's own
-# two pre-existing failure reasons — mirrors the same lookup-table pattern
-# every other bbox-grounded stage in app/outlook/ already uses, scoped to
-# the reasons this stage already declares (no new reasons introduced
-# beyond COORDINATE_SPACE_MISMATCH, which is handled separately before
-# validate_grounding() is ever called).
-_GROUNDING_FAILURE_TO_REASON = {
-    GroundingCheckFailure.INVALID_BBOX: LaunchFailureReason.GROUNDING_INVALID,
-    GroundingCheckFailure.DEGENERATE_BBOX: LaunchFailureReason.GROUNDING_INVALID,
-    GroundingCheckFailure.OUT_OF_NORMALIZED_RANGE: LaunchFailureReason.GROUNDING_INVALID,
-    GroundingCheckFailure.POINT_OUTSIDE_BBOX: LaunchFailureReason.GROUNDING_INVALID,
-    GroundingCheckFailure.MISSING_COORDINATES: LaunchFailureReason.GROUNDING_INVALID,
-    GroundingCheckFailure.OUT_OF_BOUNDS: LaunchFailureReason.GROUNDING_OUT_OF_BOUNDS,
-    GroundingCheckFailure.SIDEBAR_REJECTED: LaunchFailureReason.GROUNDING_INVALID,
-    GroundingCheckFailure.LOW_CONFIDENCE: LaunchFailureReason.GROUNDING_INVALID,
-}
-
 
 def _provider() -> tuple[VisionService, str]:
     """Kept as a thin alias to app.vision.service.get_vision_service()
@@ -147,12 +105,11 @@ def _provider() -> tuple[VisionService, str]:
     several existing call sites/tests import. Returns the VisionService
     composed from whichever provider(s) PRIMARY_VISION_PROVIDER/
     FALLBACK_VISION_PROVIDER (or the legacy AI_PROVIDER, for backward
-    compatibility) select. Every OUTLOOK_SEARCH/OUTLOOK_SEARCH_REFINE/
-    OUTLOOK_READINESS call in this module goes through this ONE
-    VisionService — there is no provider-name branch anywhere in this
-    module anymore; ground_search_result() uses the exact same bbox
-    grounding contract regardless of which provider (primary or
-    fallback) actually answers."""
+    compatibility) select. Every OUTLOOK_SEARCH/OUTLOOK_READINESS call in
+    this module goes through this ONE VisionService — there is no
+    provider-name branch anywhere in this module; ground_search_result()
+    uses the exact same semantic-verification contract regardless of
+    which provider (primary or fallback) actually answers."""
     return get_vision_service()
 
 
@@ -164,18 +121,18 @@ class OutlookLaunchResult(RND009BResult):
     the inherited `outlook_detected_timestamp`/`outlook_launch_duration_ms`
     fields, populated by poll_for_outlook_foreground().
 
-    Two OUTLOOK_SEARCH result shapes now coexist, populated by whichever
-    of _ground_search_result_claude()/_ground_search_result_gemini() ran
-    (2026-09-04, Gemini demo-restoration — previously, during the
-    Claude-only period, `grounding` was left permanently None; that is
-    no longer true now that Gemini mode populates it again):
-    - `grounding` (inherited from RND009BResult): the historical,
-      Gemini-path Optional[WindowsSearchGroundingResponse] — a loose
-      (x, y) point. Populated only in Gemini mode.
-    - `search_grounding`: the Claude-path Optional[
-      OutlookSearchGroundingResponse] — bbox-based. Populated only in
-      Claude mode. See that class's docstring in app/vision/models.py
-      for the live coordinate-contract fix this was added for."""
+    `grounding` (inherited from RND009BResult, the historical Gemini-only
+    loose-point Optional[WindowsSearchGroundingResponse]) is never
+    populated by the live dispatch as of the 2026-09-05 provider-
+    architecture unification — kept only for backward compatibility.
+    `search_grounding` (Optional[OutlookSearchGroundingResponse], bbox-
+    based) is the one OUTLOOK_SEARCH result shape used for BOTH
+    providers, populated by ground_search_result(). As of the 2026-09-06
+    keyboard-activation fix its bbox is diagnostic-only — see that
+    method's docstring — so `converted_x`/`converted_y`/
+    `search_grounding_bbox_pixels`/`raw_x`/`raw_y` below are likewise
+    never populated anymore; they remain declared for backward
+    compatibility only."""
 
     outlook_launch_started_at: Optional[str] = None
 
@@ -282,59 +239,39 @@ class OutlookLaunchSteps:
         return capture
 
     def ground_search_result(self, capture) -> bool:
-        """Shared pre-flight (abort + coordinate-space checks), then the
-        ONE OUTLOOK_SEARCH grounding strategy — bbox + semantic
-        classification + tightness self-check + bounded same-screenshot
-        refine pass — used regardless of which provider (primary or
-        fallback) actually answers the self.vision.analyze() call below.
+        """OUTLOOK_SEARCH — Vision-based SEMANTIC verification only
+        (2026-09-06 keyboard-activation fix). Used identically regardless
+        of which provider (primary or fallback) answers the
+        self.vision.analyze() call below — there is still no
+        provider-name branch anywhere in this method.
 
-        History (2026-09-05 provider-architecture unification): this
-        used to dispatch on self.provider.provider_name to one of two
-        entirely different OUTLOOK_SEARCH implementations — a Claude-only
-        bbox-based one (this method's current body) and a Gemini-only
-        loose-point one, because Gemini's original single-point contract
-        "just worked" and was never revisited. That was the ONE
-        provider-name branch anywhere in the find/read/reply/draft/send
-        pipeline, and it directly violated the "one Outlook workflow"
-        rule once Gemini became a fallback rather than an independently-
-        selected primary. Every OTHER bbox-grounded stage in this
-        codebase (EmailSearchResponse, ReplySearchResponse,
-        SendSearchResponse) already shares one schema across both
-        providers successfully — so this stage now does too. The
-        Gemini-only loose-point contract itself is NOT deleted: it
-        remains exactly as it was, frozen, at rnd/prompts/
-        windows_search_grounding_v1.txt and rnd/models/outlook_launch.py
-        ::WindowsSearchGroundingResponse — simply no longer referenced
-        by the live dispatch."""
+        History: a live Claude-primary run reproduced this project's
+        long-standing finding that Claude's semantic recognition for this
+        stage is reliable (target_visible/target_type/visible_label all
+        correct) but its BBOX is not — the resulting click landed above
+        the actual result and Outlook never got foreground
+        (OUTLOOK_FOREGROUND_VERIFICATION_FAILED). This used to be
+        "solved" with a bbox-tightness self-check + bounded same-
+        screenshot refine pass + oversized-bbox geometry check +
+        validate_grounding() pixel conversion, all in service of
+        producing an accurate CLICK point. None of that made the bbox
+        reliable enough in practice, and building a more elaborate
+        Claude-specific bbox pipeline would have meant exactly the kind
+        of second, provider-specific Outlook flow this architecture
+        exists to avoid.
+
+        Instead, physical activation for THIS stage no longer depends on
+        ANY Vision-reported coordinate at all — see
+        activate_outlook_result() below, which presses Enter (the same
+        keyboard action a human uses to open Windows Search's own top
+        result) once semantic verification passes. Vision's bbox is
+        still accepted in the response schema (OutlookSearchGroundingResponse)
+        and logged for diagnostics, but it is never converted to pixels
+        and never drives a physical action for this stage — every other
+        bbox-grounded stage (email row, Reply, Send) is completely
+        unaffected and still uses validate_grounding()/click execution
+        exactly as before."""
         if self.check_abort("before_vision_call"):
-            return False
-
-        # Coordinate-SPACE check, independent of anything Vision returns
-        # and independent of which provider is active: if the screenshot
-        # mss captured and pyautogui's own reported screen size disagree,
-        # ANY coordinate computed from the screenshot and later used to
-        # move the mouse would be systematically wrong regardless of how
-        # correct the grounding itself is. Checked first (cheap, local,
-        # no network) so a mismatch fails fast before spending a Vision
-        # call, for either provider.
-        env_info = get_environment_info()
-        self.result.pyautogui_width = env_info.get("pyautogui_width")
-        self.result.pyautogui_height = env_info.get("pyautogui_height")
-        dimensions_match = env_info.get("dimensions_match")
-        self.result.dimensions_match = dimensions_match
-        _grounding_logger.info(
-            "COORDINATE_SPACE screenshot_size=%sx%s pyautogui_size=%sx%s dimensions_match=%s",
-            capture.width, capture.height, env_info.get("pyautogui_width"), env_info.get("pyautogui_height"),
-            dimensions_match,
-        )
-        if dimensions_match is False:
-            self.result.result = "FAIL"
-            self.result.failure_reason = LaunchFailureReason.COORDINATE_SPACE_MISMATCH
-            self.result.notes = (
-                f"Screenshot size ({capture.width}x{capture.height}) does not match pyautogui's reported "
-                f"screen size ({env_info.get('pyautogui_width')}x{env_info.get('pyautogui_height')}). "
-                "Refusing to compute a click point in a mismatched coordinate space."
-            )
             return False
 
         prompt_text = WINDOWS_SEARCH_GROUNDING_PROMPT_PATH.read_text(encoding="utf-8").format(
@@ -342,7 +279,7 @@ class OutlookLaunchSteps:
         )
         outcome = self.vision.analyze(VisionRequest(
             stage=STAGE_OUTLOOK_SEARCH, screenshot_path=Path(capture.path),
-            goal="Locate the Outlook search result", prompt_text=prompt_text,
+            goal="Verify the Outlook search result is present", prompt_text=prompt_text,
             response_model=OutlookSearchGroundingResponse,
         ))
         self.result.provider_retries += outcome.primary_retries + outcome.fallback_retries
@@ -370,11 +307,13 @@ class OutlookLaunchSteps:
             return False
 
         self.result.search_grounding = structured
+        # raw_bbox is logged for diagnostics ONLY — never converted to
+        # pixels, never used to move a mouse, for this stage.
         _grounding_logger.info(
-            "OUTLOOK_GROUNDING target_visible=%s target_type=%s visible_label=%r raw_bbox=%r "
-            "bbox_order=[y_min,x_min,y_max,x_max] screenshot_size=%sx%s confidence=%s",
+            "OUTLOOK_SEARCH_RESULT target_visible=%s target_type=%s visible_label=%r visible_sublabel=%r "
+            "raw_bbox=%r confidence=%s provider_used=%s",
             structured.target_visible, structured.target_type, structured.visible_label,
-            structured.bbox, capture.width, capture.height, structured.confidence,
+            structured.visible_sublabel, structured.bbox, structured.confidence, outcome.provider_used,
         )
 
         if not structured.search_visible:
@@ -386,17 +325,17 @@ class OutlookLaunchSteps:
             self.result.failure_reason = LaunchFailureReason.OUTLOOK_RESULT_NOT_FOUND
             return False
         # Deterministic, code-side policy — Vision only ever REPORTS what
-        # it sees; it never decides whether a click is authorized. Only a
-        # result Vision itself classified as the desktop app, AND whose
-        # own label text still independently mentions "outlook" (cheap
-        # defense-in-depth against a type/label disagreement), is ever
-        # eligible to proceed.
+        # it sees; it never decides whether activation is authorized.
+        # Only a result Vision itself classified as the desktop app, AND
+        # whose own label text still independently mentions "outlook"
+        # (cheap defense-in-depth against a type/label disagreement), is
+        # ever eligible to proceed.
         if structured.target_type != "desktop_app":
             self.result.result = "FAIL"
             self.result.failure_reason = LaunchFailureReason.OUTLOOK_RESULT_WRONG_TYPE
             self.result.notes = (
                 f"Target was visible but classified as target_type={structured.target_type!r} "
-                f"(visible_label={structured.visible_label!r}), not the desktop app — refusing to click."
+                f"(visible_label={structured.visible_label!r}), not the desktop app — refusing to activate."
             )
             return False
         if "outlook" not in structured.visible_label.lower():
@@ -406,7 +345,7 @@ class OutlookLaunchSteps:
             return False
         # Secondary identity signal, independent of visible_label: a
         # section header or container would never have an "App"-style
-        # sublabel under it. Only checked when Claude actually reported
+        # sublabel under it. Only checked when Vision actually reported
         # one — an empty sublabel is not itself disqualifying (Vision may
         # legitimately not see one), but a REPORTED sublabel that doesn't
         # look like an app indicator contradicts the desktop_app claim.
@@ -418,179 +357,13 @@ class OutlookLaunchSteps:
                 "does not indicate an app result — identity signals disagree."
             )
             return False
-
-        bbox = structured.bbox
-        if bbox is None or len(bbox) != 4:
+        if structured.confidence < GROUNDING_CONFIDENCE_THRESHOLD:
             self.result.result = "FAIL"
             self.result.failure_reason = LaunchFailureReason.GROUNDING_INVALID
-            self.result.notes = f"Outlook result reported visible but had no valid bbox: {bbox!r}."
+            self.result.notes = f"Confidence {structured.confidence} below threshold {GROUNDING_CONFIDENCE_THRESHOLD}."
             return False
 
-        confidence_for_validation = structured.confidence
-
-        # Bbox-SCOPING self-check (2026-09-03 live evidence: target_type/
-        # visible_label/confidence were all correctly reported, but the
-        # bbox covered the "Best match" section header above the row
-        # instead of the row itself — a distinct bug from target identity,
-        # which the checks above already cover). If Claude itself was not
-        # confident the bbox is tightly scoped to just the row, run ONE
-        # bounded, SAME-screenshot second-pass call asking only for a
-        # tighter bbox for the row already identified — no new screenshot,
-        # no physical action, never more than this one extra read-only
-        # call. If the refine pass still can't produce a confident, valid
-        # bbox, this fails closed (OUTLOOK_RESULT_BBOX_NOT_TIGHT) rather
-        # than falling back to the bbox already flagged as possibly
-        # including the header/container.
-        if not structured.bbox_tightly_scoped:
-            if self.check_abort("before_refine_vision_call"):
-                return False
-
-            refine_prompt = OUTLOOK_SEARCH_REFINE_PROMPT_PATH.read_text(encoding="utf-8").format(
-                visible_label=structured.visible_label, visible_sublabel=structured.visible_sublabel,
-                width=capture.width, height=capture.height,
-            )
-            refine_outcome = self.vision.analyze(VisionRequest(
-                stage=STAGE_OUTLOOK_SEARCH_REFINE, screenshot_path=Path(capture.path),
-                goal="Tighten the bbox for the previously identified Outlook result", prompt_text=refine_prompt,
-                response_model=OutlookSearchRefineResponse,
-            ))
-            self.result.provider_retries += refine_outcome.primary_retries + refine_outcome.fallback_retries
-            self.result.fallback_uses += 1 if refine_outcome.fallback_used else 0
-            self.result.refine_pass_used = True
-
-            refined = refine_outcome.parsed
-            if refined is not None:
-                refine_call_metrics = refine_outcome.call_metrics
-                refine_metrics = CallMetrics(
-                    latency_ms=refine_call_metrics.latency_ms, input_tokens=refine_call_metrics.input_tokens,
-                    output_tokens=refine_call_metrics.output_tokens,
-                    estimated_cost=estimate_cost(
-                        refine_call_metrics.provider_name, refine_call_metrics.model,
-                        refine_call_metrics.input_tokens, refine_call_metrics.output_tokens,
-                    ),
-                )
-                self._accumulate(refine_metrics)
-
-            self.result.search_grounding_refine = refined
-            _grounding_logger.info(
-                "OUTLOOK_GROUNDING_REFINE target_visible=%s raw_bbox=%r confidence=%s",
-                refined.target_visible if refined else None,
-                refined.bbox if refined else None,
-                refined.confidence if refined else None,
-            )
-
-            if refined is None or not refined.target_visible or refined.bbox is None or len(refined.bbox) != 4:
-                self.result.result = "FAIL"
-                self.result.failure_reason = LaunchFailureReason.OUTLOOK_RESULT_BBOX_NOT_TIGHT
-                self.result.notes = (
-                    "First-pass bbox was not confidently tightly-scoped to the result row, and the bounded "
-                    "second-pass refine call could not confirm a tight bbox either. Refusing to click a bbox "
-                    "known to possibly include the section header/container."
-                )
-                return False
-
-            bbox = refined.bbox
-            confidence_for_validation = refined.confidence
-
-        # Generic, resolution-independent sanity check: a single
-        # clickable search-result row/tile can never legitimately span
-        # nearly the ENTIRE screenshot HEIGHT — a topological fact, true
-        # at any resolution/theme/scaling, not a screen-specific
-        # threshold. Checked on HEIGHT ALONE, deliberately not width: a
-        # legitimate single row commonly spans most of the panel's WIDTH
-        # (normal, must not be rejected), but a search flyout always
-        # shows more than just one row's worth of vertical space (the
-        # search box, tabs, and multiple result rows stacked below each
-        # other) — so a bbox whose height alone approaches the whole
-        # screenshot's height can never be one row; it must be a column,
-        # panel, or the whole results container. This one check catches
-        # both the extreme "grounded the whole screen/panel" case and a
-        # tall-but-narrow "whole results column" bbox, without penalizing
-        # legitimately wide rows.
-        #
-        # A moderately-oversized container bbox that is NOT tall enough to
-        # trip this (e.g. just the search-results group, not a full-height
-        # column) is NOT reliably distinguishable from a legitimately
-        # large multi-line result tile by geometry alone without inventing
-        # a brittle, layout-specific assumption — that case is instead
-        # caught by the target_type/visible_label/visible_sublabel
-        # semantic checks and the bbox_tightly_scoped self-check above,
-        # the prompt's explicit "never the container" instruction, and the
-        # human-approval gate before any physical action. Re-applied here
-        # even after a refine pass, since the refined bbox is a new claim
-        # too.
-        y_min, x_min, y_max, x_max = bbox
-        if (y_max - y_min) >= MAX_PLAUSIBLE_RESULT_BBOX_NORMALIZED_SPAN:
-            self.result.result = "FAIL"
-            self.result.failure_reason = LaunchFailureReason.GROUNDING_INVALID
-            self.result.notes = (
-                f"bbox {bbox!r} spans nearly the entire screenshot height — "
-                "not a plausible single result row; refusing to click a container/column-sized region."
-            )
-            return False
-
-        # bbox is [y_min, x_min, y_max, x_max], 0-1000 normalized — SAME
-        # convention as every other bbox in this project (see
-        # OutlookSearchGroundingResponse's docstring). The click point is
-        # the bbox CENTER, computed by validate_grounding() from the bbox
-        # itself — never Claude's own loose x/y (there isn't one anymore),
-        # and never trusted without the point-inside-its-own-bbox,
-        # normalized-range, degenerate-bbox, and pixel-bounds checks
-        # validate_grounding() already applies to every other grounded
-        # click target (email row, Reply, Send).
-        center_x, center_y = (x_min + x_max) / 2, (y_min + y_max) / 2
-
-        validation = validate_grounding(
-            raw_x=center_x, raw_y=center_y, box_2d=bbox, confidence=confidence_for_validation,
-            image_width=capture.width, image_height=capture.height,
-            confidence_threshold=GROUNDING_CONFIDENCE_THRESHOLD,
-            sidebar_max_x_fraction=None,  # the search-result list is not the Outlook sidebar
-        )
-
-        self.result.search_grounding_bbox_raw = list(bbox)
-        screen_bbox_pixels = None
-        click_point = None
-        if validation.converted_x is not None:
-            px_min, py_min = normalize_1000_to_pixels(x_min, y_min, capture.width, capture.height)
-            px_max, py_max = normalize_1000_to_pixels(x_max, y_max, capture.width, capture.height)
-            screen_bbox_pixels = [round(py_min), round(px_min), round(py_max), round(px_max)]
-            self.result.search_grounding_bbox_pixels = screen_bbox_pixels
-            self.result.raw_x, self.result.raw_y = center_x, center_y
-            self.result.converted_x, self.result.converted_y = validation.converted_x, validation.converted_y
-            click_point = (validation.converted_x, validation.converted_y)
-            self.result.coordinate_in_screen_bounds = validation.failure != GroundingCheckFailure.OUT_OF_BOUNDS
-
-        _grounding_logger.info(
-            "OUTLOOK_GROUNDING target_visible=%s target_type=%s visible_label=%r visible_sublabel=%r "
-            "raw_bbox=%r bbox_order=[y_min,x_min,y_max,x_max] refine_pass_used=%s screenshot_size=%sx%s "
-            "screen_bbox=%r click_point=%r confidence=%s valid=%s",
-            structured.target_visible, structured.target_type, structured.visible_label,
-            structured.visible_sublabel, bbox, self.result.refine_pass_used,
-            capture.width, capture.height, screen_bbox_pixels, click_point, confidence_for_validation,
-            validation.valid,
-        )
-
-        if _DEBUG_ARTIFACTS_ENABLED:
-            artifact_path = save_grounding_debug_artifact(
-                Path(capture.path), screen_bbox_pixels, click_point, label="outlook_search_grounding",
-                overlay_text=(
-                    f"target_type={structured.target_type} visible_label={structured.visible_label!r} "
-                    f"confidence={confidence_for_validation} refined={self.result.refine_pass_used}"
-                ),
-            )
-            if artifact_path is not None:
-                self.result.grounding_debug_artifact = str(artifact_path)
-
-        if not validation.valid:
-            self.result.result = "FAIL"
-            self.result.failure_reason = _GROUNDING_FAILURE_TO_REASON.get(
-                validation.failure, LaunchFailureReason.GROUNDING_INVALID,
-            )
-            if validation.notes:
-                self.result.notes = validation.notes
-            return False
-
-        return True  # ready for human approval
+        return True  # ready for human approval / activation
 
     def record_human_approval(self, approved: bool) -> bool:
         self.result.human_target_approved = approved
@@ -600,88 +373,51 @@ class OutlookLaunchSteps:
             self.result.failure_reason = LaunchFailureReason.HUMAN_REJECTED_TARGET
         return approved
 
-    def click_outlook_result(self) -> bool:
-        if self.check_abort("before_mouse_movement"):
-            _grounding_logger.info("OUTLOOK_CLICK_BLOCKED reason=abort_requested")
+    def activate_outlook_result(self) -> bool:
+        """Deterministic keyboard activation (2026-09-06 — replaces the
+        old coordinate-based click). Vision's job for OUTLOOK_SEARCH ends
+        at ground_search_result()'s semantic verification above; this
+        method performs exactly ONE Enter key press (pyautogui) — the
+        same user-equivalent action a human uses to open Windows
+        Search's own top result — never dependent on a Vision-reported
+        coordinate, and identical regardless of which provider produced
+        the semantic verification. No mouse movement, no click, no
+        fixed/hardcoded x/y, no direct executable launch, no COM/API/Graph."""
+        if self.check_abort("before_activation"):
+            _grounding_logger.info("OUTLOOK_ACTIVATION_BLOCKED reason=abort_requested")
             return False
         if not self.result.human_target_approved:
-            raise RuntimeError("Cannot click: human approval was not recorded as True.")
-
-        # Stale-state protection: the bbox/click point were computed from
-        # the ONE screenshot captured in capture_search_screenshot(); no
-        # new Vision call happens between grounding and click (per
-        # instruction — freshness is enforced by re-checking the *current*
-        # foreground state below, not by re-observing with Vision). This
-        # elapsed time is diagnostic evidence of how long that screenshot
-        # has been trusted for, not a hard gate — the human-approval step
-        # in between is an intentional, variable-length pause.
-        elapsed_since_capture_ms = (
-            round((time.monotonic() - self._search_capture_monotonic) * 1000, 1)
-            if self._search_capture_monotonic is not None else None
-        )
+            raise RuntimeError("Cannot activate: human approval was not recorded as True.")
 
         title = get_foreground_window_title()
         if not is_search_state_foreground(title):
             self.result.result = "FAIL"
             self.result.failure_reason = LaunchFailureReason.SEARCH_STATE_LOST_BEFORE_CLICK
-            self.result.notes = f"Search state lost before move; foreground was {title!r}. NO movement, no click."
+            self.result.notes = f"Search state lost before activation; foreground was {title!r}. NO key press."
             _grounding_logger.info(
-                "OUTLOOK_CLICK_BLOCKED reason=search_state_lost_before_move foreground=%r", title,
+                "OUTLOOK_ACTIVATION_BLOCKED reason=search_state_lost foreground=%r", title,
             )
             return False
 
         _grounding_logger.info(
-            "OUTLOOK_CLICK_PRECHECK foreground_ok=True abort_requested=False click_point=(%s, %s) "
-            "elapsed_since_capture_ms=%s",
-            self.result.converted_x, self.result.converted_y, elapsed_since_capture_ms,
+            "OUTLOOK_ACTIVATION_PRECHECK semantic_valid=True foreground_ok=True abort_requested=False",
         )
 
         assert pyautogui.FAILSAFE is True
         try:
-            _grounding_logger.info(
-                "OUTLOOK_MOUSE_MOVE_START click_point=(%s, %s)", self.result.converted_x, self.result.converted_y,
-            )
-            pyautogui.moveTo(self.result.converted_x, self.result.converted_y, duration=MOVE_DURATION_SECONDS)
-            _grounding_logger.info("OUTLOOK_MOUSE_MOVE_COMPLETE")
+            _grounding_logger.info("OUTLOOK_ENTER_ABOUT_TO_EXECUTE")
+            pyautogui.press("enter")  # single key press only
+            _grounding_logger.info("OUTLOOK_ENTER_EXECUTED")
         except Exception as exc:
-            _grounding_logger.info("OUTLOOK_CLICK_FAILED exception_type=%s message=%s", type(exc).__name__, exc)
+            _grounding_logger.info("OUTLOOK_ACTIVATION_FAILED exception_type=%s message=%s", type(exc).__name__, exc)
             self.result.result = "ERROR"
             self.result.failure_reason = LaunchFailureReason.PHYSICAL_ACTION_FAILED
-            self.result.notes = f"Mouse move failed: {type(exc).__name__}: {exc}"
-            return False
-
-        if self.check_abort("before_click"):
-            _grounding_logger.info("OUTLOOK_CLICK_BLOCKED reason=abort_requested_after_move")
-            return False
-
-        title2 = get_foreground_window_title()
-        self.result.foreground_before_click = title2
-        if not is_search_state_foreground(title2):
-            self.result.result = "FAIL"
-            self.result.failure_reason = LaunchFailureReason.SEARCH_STATE_LOST_BEFORE_CLICK
-            self.result.notes = f"Search state lost between move and click; foreground was {title2!r}. NO CLICK performed."
-            _grounding_logger.info(
-                "OUTLOOK_CLICK_BLOCKED reason=search_state_lost_before_click foreground=%r", title2,
-            )
-            return False
-
-        try:
-            _grounding_logger.info(
-                "OUTLOOK_CLICK_ABOUT_TO_EXECUTE click_point=(%s, %s)",
-                self.result.converted_x, self.result.converted_y,
-            )
-            pyautogui.click()  # single click only
-            _grounding_logger.info("OUTLOOK_CLICK_EXECUTED")
-        except Exception as exc:
-            _grounding_logger.info("OUTLOOK_CLICK_FAILED exception_type=%s message=%s", type(exc).__name__, exc)
-            self.result.result = "ERROR"
-            self.result.failure_reason = LaunchFailureReason.PHYSICAL_ACTION_FAILED
-            self.result.notes = f"Click failed: {type(exc).__name__}: {exc}"
+            self.result.notes = f"Enter key press failed: {type(exc).__name__}: {exc}"
             return False
 
         self.result.outlook_click_timestamp = datetime.now().isoformat()
         self.result.outlook_launch_click_executed = True
-        self.result.mouse_click_count += 1
+        self.result.keyboard_action_count += 1  # keyboard action, not a mouse click
         return True
 
     def poll_for_outlook_foreground(self) -> bool:
@@ -698,6 +434,7 @@ class OutlookLaunchSteps:
                 self.result.foreground_verified = True
                 self.result.outlook_detected_timestamp = datetime.now().isoformat()
                 self.result.outlook_launch_duration_ms = round((time.monotonic() - start) * 1000, 1)
+                _grounding_logger.info("POST_ACTIVATION_OUTLOOK_VERIFICATION success=True")
                 return True
             if (time.monotonic() - start) >= OUTLOOK_LAUNCH_TIMEOUT_SECONDS:
                 self.result.result = "FAIL"
@@ -705,6 +442,7 @@ class OutlookLaunchSteps:
                 self.result.foreground_after_launch = title
                 self.result.foreground_verified = False
                 self.result.notes = f"Outlook foreground not detected within {OUTLOOK_LAUNCH_TIMEOUT_SECONDS}s. Last foreground: {title!r}."
+                _grounding_logger.info("POST_ACTIVATION_OUTLOOK_VERIFICATION success=False")
                 return False
             time.sleep(OUTLOOK_LAUNCH_POLL_INTERVAL_SECONDS)
 

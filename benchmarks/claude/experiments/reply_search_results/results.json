@@ -1,0 +1,80 @@
+{
+  "source_screenshot": "D:\\AutoLook-POC\\outlook-vision-poc\\screenshots\\raw\\screen_20260906_151542_414.png",
+  "trials": [
+    {
+      "trial": 1,
+      "schema_valid": true,
+      "json_parse_failed": false,
+      "stop_reason": "end_turn",
+      "output_tokens": 572,
+      "response_char_count": 1875,
+      "contains_markdown_fence": null,
+      "brace_balance": null,
+      "json_starts_with_object": null,
+      "json_ends_with_object": null,
+      "leading_non_whitespace_char_type": null,
+      "trailing_non_whitespace_after_object": null,
+      "latency_ms": 12679.5
+    },
+    {
+      "trial": 2,
+      "schema_valid": true,
+      "json_parse_failed": false,
+      "stop_reason": "end_turn",
+      "output_tokens": 479,
+      "response_char_count": 1482,
+      "contains_markdown_fence": null,
+      "brace_balance": null,
+      "json_starts_with_object": null,
+      "json_ends_with_object": null,
+      "leading_non_whitespace_char_type": null,
+      "trailing_non_whitespace_after_object": null,
+      "latency_ms": 11219.4
+    },
+    {
+      "trial": 3,
+      "schema_valid": true,
+      "json_parse_failed": false,
+      "stop_reason": "end_turn",
+      "output_tokens": 536,
+      "response_char_count": 1628,
+      "contains_markdown_fence": null,
+      "brace_balance": null,
+      "json_starts_with_object": null,
+      "json_ends_with_object": null,
+      "leading_non_whitespace_char_type": null,
+      "trailing_non_whitespace_after_object": null,
+      "latency_ms": 11803.3
+    },
+    {
+      "trial": 4,
+      "schema_valid": true,
+      "json_parse_failed": false,
+      "stop_reason": "end_turn",
+      "output_tokens": 482,
+      "response_char_count": 1312,
+      "contains_markdown_fence": null,
+      "brace_balance": null,
+      "json_starts_with_object": null,
+      "json_ends_with_object": null,
+      "leading_non_whitespace_char_type": null,
+      "trailing_non_whitespace_after_object": null,
+      "latency_ms": 10097.1
+    },
+    {
+      "trial": 5,
+      "schema_valid": true,
+      "json_parse_failed": false,
+      "stop_reason": "end_turn",
+      "output_tokens": 692,
+      "response_char_count": 1981,
+      "contains_markdown_fence": null,
+      "brace_balance": null,
+      "json_starts_with_object": null,
+      "json_ends_with_object": null,
+      "leading_non_whitespace_char_type": null,
+      "trailing_non_whitespace_after_object": null,
+      "latency_ms": 14297.3
+    }
+  ]
+}

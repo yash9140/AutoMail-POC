@@ -36,6 +36,7 @@ from app.vision.providers.base import ProviderCallResult  # noqa: E402
 from app.vision.providers.gemini_provider import GeminiProvider  # noqa: E402
 from app.vision.providers.openai_provider import OpenAIProvider  # noqa: E402
 from app.workers.send_worker import SendWorker  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 LAUNCH_MODULE = "app.outlook.launch"
 FIND_MODULE = "app.outlook.find_email"
@@ -77,7 +78,7 @@ def _email_grounding():
         "outlook_visible": True, "message_list_visible": True, "target_visible": True, "candidate_count": 1,
         "candidates": [{
             "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "subject_truncated": False,
-            "date_or_order": "Today", "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+            "date_or_order": "Today", "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
         }],
         "more_content_below": False, "reason": "ok",
     })
@@ -111,9 +112,15 @@ def _draft_verification(semantic_match=True):
                      "confidence": 0.95, "reason": "ok"})
 
 
+def _send_composer_localization():
+    return _result({"composer_visible": True, "action_bar_visible": True,
+                     "action_bar_bbox": [900.0, 350.0, 980.0, 550.0], "composer_bbox": None,
+                     "confidence": 0.95, "reason": "ok"})
+
+
 def _send_search():
     return _result({"outlook_visible": True, "send_visible": True, "control_identity": "Send",
-                     "control_type": "button", "bbox": [400.0, 800.0, 440.0, 900.0], "confidence": 0.95, "reason": "ok"})
+                     "control_type": "button", "bbox": [619.0, 385.0, 837.0, 616.0], "confidence": 0.95, "reason": "ok"})
 
 
 def _sent_verification(verified=True):
@@ -143,10 +150,6 @@ def _patch_physical_actions(stack: ExitStack, titles) -> dict:
     stack.enter_context(patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.maximize"))
-    stack.enter_context(patch(
-        f"{LAUNCH_MODULE}.get_environment_info",
-        return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True},
-    ))
     for module in (FIND_MODULE, READ_MODULE, REPLY_MODULE, DRAFT_MODULE, SEND_MODULE):
         stack.enter_context(patch(f"{module}.get_foreground_window_title", return_value="Inbox - Outlook"))
 
@@ -159,7 +162,10 @@ def _patch_physical_actions(stack: ExitStack, titles) -> dict:
     ):
         stack.enter_context(patch(
             f"{module}.capture_screen",
-            return_value=MagicMock(filename=f"{name}.png", path=f"{name}.png", width=1920, height=1080),
+            return_value=MagicMock(
+                filename=f"{name}.png", path=real_capture_image_path(1920, 1080, name=f"{name}.png"),
+                width=1920, height=1080,
+            ),
         ))
 
     return pyautogui_mocks
@@ -173,6 +179,7 @@ def _happy_path_side_effects():
         _state_check(True),          # verify_reply_editor
         _draft_generation(),
         _draft_verification(True),
+        _send_composer_localization(),
         _send_search(),
         _sent_verification(True),
     ]
@@ -180,6 +187,10 @@ def _happy_path_side_effects():
 
 def test_full_happy_path_e2e_simulation_reaches_completed(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "anthropic")  # this E2E asserts Claude-only behavior regardless of the real .env
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     signals = {"success": [], "failure": [], "aborted": [], "current_step": []}
     worker = SendWorker(AbortController(), bounded_approval_granted=True, send_approval_granted=True)
     worker.success.connect(lambda r: signals["success"].append(r))
@@ -206,15 +217,19 @@ def test_full_happy_path_e2e_simulation_reaches_completed(monkeypatch):
     assert signals["current_step"] == EXPECTED_HAPPY_PATH_STEP_SEQUENCE
     assert signals["current_step"][-1] == "COMPLETED"
 
-    # Every Vision call went through Claude — 11 stages, 12 calls (email
+    # Every Vision call went through Claude — 12 stages, 13 calls (email
     # understanding is split into an extraction + a holistic-assessment
-    # call as of the 2026-09-04 latency fix — see app/outlook/read_email.py).
-    assert mock_analyze.call_count == 12
+    # call as of the 2026-09-04 latency fix — see app/outlook/read_email.py;
+    # Send grounding is split into SEND_COMPOSER_LOCALIZATION + SEND_
+    # GROUNDING as of the 2026-09-06 two-stage Send-grounding architecture
+    # — see app/outlook/send.py).
+    assert mock_analyze.call_count == 13
 
-    # Physical action counts: one Outlook-result click, one email-row
-    # click, one Send click; no reply-control click (editor was already
-    # open in this fixture).
-    assert mocks["launch"].click.call_count == 1
+    # Physical action counts: Outlook-result ACTIVATION is a keyboard
+    # Enter press (2026-09-06 keyboard-activation fix), not a click; one
+    # email-row click, one Send click; no reply-control click (editor
+    # was already open in this fixture).
+    assert mocks["launch"].click.call_count == 0
     assert mocks["find"].click.call_count == 1
     assert mocks["send"].click.call_count == 1
 
@@ -226,6 +241,10 @@ def test_failure_path_e2e_simulation_long_email_incomplete_stops_before_reply(mo
     from app.config.settings import MAX_EMAIL_BODY_SCROLL_ATTEMPTS
 
     monkeypatch.setenv("AI_PROVIDER", "anthropic")  # this E2E asserts Claude-only behavior regardless of the real .env
+    # 2026-09-06: isolate from the real .env, which now sets these two
+    # — this test asserts single-provider (AI_PROVIDER-only) behavior.
+    monkeypatch.setenv("PRIMARY_VISION_PROVIDER", "")
+    monkeypatch.setenv("FALLBACK_VISION_PROVIDER", "")
     signals = {"success": [], "failure": [], "current_step": []}
     worker = SendWorker(AbortController(), bounded_approval_granted=True, send_approval_granted=True)
     worker.success.connect(lambda r: signals["success"].append(r))

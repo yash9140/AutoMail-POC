@@ -1,8 +1,18 @@
 You are looking at a Windows 11 desktop screenshot taken immediately
 after the Windows Search UI was opened and the text "Outlook" was
 typed into the search box. You do not decide what to do next — only
-report what you see and where. A later, separate step decides whether
-to click; your report alone never authorizes any physical action.
+report what you see. A later, separate step decides what to do; your
+report alone never authorizes any physical action.
+
+WHAT MATTERS MOST HERE: correctly identifying WHETHER the desktop
+Outlook application result is visible, and confirming its identity
+(target_type/visible_label/visible_sublabel). That identification is
+what a later step acts on — it presses the keyboard Enter key on
+whatever Windows Search's own top result already is, the same way a
+person would, rather than clicking a location you report. Your bbox
+below is still useful context and is logged, but it does not drive any
+physical action — getting the semantic identification right matters
+far more than getting the bbox pixel-perfect.
 
 Original screenshot dimensions:
 width = {width}
@@ -74,22 +84,21 @@ Determine:
    — e.g. "App". Leave empty ("") if no such secondary text is visible.
 6. If target_visible is true, its bounding box (see below).
 
-BBOX TIGHTNESS — this is the part that has gone wrong before:
+BBOX (best-effort, diagnostic only — not used to click or activate anything):
 
-The bbox must tightly enclose ONLY the clickable row/tile — the icon,
-the label text, and the sublabel text if present — and NOTHING else.
-It must NOT extend upward to include the "Best match" heading or any
-other section title. It must NOT extend to include the container/panel
-around it. Picture the row as its own small rectangle, distinct from
-everything above, below, or beside it.
+Report a bbox that roughly encloses the clickable row/tile — the icon,
+the label text, and the sublabel text if present. It should not extend
+upward to include the "Best match" heading or any other section title,
+and should not span the whole container/panel around it. This is
+useful context, not a precision requirement — an approximate box is
+fine as long as your target_visible/target_type/visible_label/
+visible_sublabel identification above is correct, since those are what
+determine what happens next, not the bbox.
 
-Before answering, explicitly re-check your own bbox: does it contain
-ONLY the icon + label + sublabel of this one row, or does it also
-include the section heading above it, extra whitespace, or neighboring
-content? Set bbox_tightly_scoped to true ONLY if you are confident the
-bbox contains just that row. If you are not confident the bbox is
-tightly scoped, set bbox_tightly_scoped to false — do not guess a
-tighter box you are not sure of, and do not fabricate coordinates.
+Still set bbox_tightly_scoped to your honest best judgment (true if you
+believe the bbox contains just that row, false if you're not sure it
+excludes the heading/container) — this is recorded for diagnostics, but
+never gates any action.
 
 COORDINATE CONTRACT — read carefully, this is the ONLY accepted format:
 

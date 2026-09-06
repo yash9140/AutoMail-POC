@@ -19,6 +19,7 @@ from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.providers.base import NetworkError  # noqa: E402
 from app.vision.service import VisionService  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 MODULE = "app.outlook.draft"
 LAUNCH_MODULE = "app.outlook.launch"
@@ -467,7 +468,7 @@ def _email_grounding():
             "candidate_count": 1,
             "candidates": [{
                 "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "date_or_order": "Today",
-                "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+                "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
             }],
             "more_content_below": False, "reason": "ok",
         },
@@ -498,10 +499,6 @@ def _patch_launch_and_find(stack: ExitStack, titles) -> dict:
     stack.enter_context(patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.maximize"))
-    stack.enter_context(patch(
-        f"{LAUNCH_MODULE}.get_environment_info",
-        return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True},
-    ))
     stack.enter_context(patch(f"{FIND_MODULE}.get_foreground_window_title", return_value="Inbox - Outlook"))
 
     stack.enter_context(patch(
@@ -510,7 +507,9 @@ def _patch_launch_and_find(stack: ExitStack, titles) -> dict:
     ))
     stack.enter_context(patch(
         f"{FIND_MODULE}.capture_screen",
-        return_value=MagicMock(filename="b.png", path="b.png", width=1920, height=1080),
+        return_value=MagicMock(
+            filename="b.png", path=real_capture_image_path(1920, 1080, name="b.png"), width=1920, height=1080,
+        ),
     ))
     return pyautogui_mocks
 
@@ -541,7 +540,11 @@ def test_provider_retries_one_when_first_grounding_call_fails_then_succeeds():
         mocks = _patch_launch_and_find(stack, _titles())
         assert steps.run_find_and_open_email() is True
     assert steps.result.provider_retries == 1
-    assert mocks["launch"].click.call_count == 1  # click still happens exactly once, after the retry resolved
+    # OUTLOOK_SEARCH activation is a keyboard Enter press (2026-09-06
+    # keyboard-activation fix), not a click — happens exactly once, after
+    # the retry resolved. press.call_count is 2: Windows key + Enter.
+    assert mocks["launch"].press.call_count == 2
+    assert mocks["launch"].click.call_count == 0
 
 
 def test_provider_retries_one_and_failure_retained_when_both_attempts_fail():
@@ -570,7 +573,10 @@ def test_provider_retry_never_repeats_windows_key_search_typing_or_click():
     with ExitStack() as stack:
         mocks = _patch_launch_and_find(stack, _titles())
         assert steps.run_find_and_open_email() is True
-    assert mocks["launch"].press.call_count == 1   # Windows key — pressed once, never repeated by the retry
+    # Windows key + Enter activation — each pressed once, never repeated
+    # by the retry (2026-09-06 keyboard-activation fix: no click for
+    # OUTLOOK_SEARCH anymore).
+    assert mocks["launch"].press.call_count == 2
     assert mocks["launch"].write.call_count == 1   # "Outlook" typed once
-    assert mocks["launch"].click.call_count == 1   # Outlook-result click — once, after grounding resolved
+    assert mocks["launch"].click.call_count == 0   # OUTLOOK_SEARCH never clicks
     assert mocks["find"].click.call_count == 1     # target-email-row click — once

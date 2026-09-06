@@ -26,15 +26,29 @@ def save_grounding_debug_artifact(
     click_point: Optional[tuple[int, int]],
     label: str = "outlook_search_grounding",
     overlay_text: Optional[str] = None,
+    boundary_lines: Optional[list[tuple[int, str, str]]] = None,
+    valid: Optional[bool] = None,
 ) -> Optional[Path]:
     """Saves a copy of image_path with bbox_pixels ([y_min, x_min, y_max,
     x_max], native pixels) drawn as a rectangle and click_point (native
     pixels) drawn as a marker. overlay_text (e.g. "target_type=desktop_app
     visible_label='Outlook' confidence=0.97"), if given, is drawn as a
     small text label near the top of the image — purely for a human
-    reviewer's convenience. Returns the saved path, or None if
-    drawing/saving failed (never raises — a diagnostic artifact must
-    never be able to break the real grounding flow that called it)."""
+    reviewer's convenience.
+
+    boundary_lines (added 2026-09-06, optional, backward compatible —
+    existing callers passing nothing are unaffected): a list of
+    (x_pixel, color, label) vertical reference lines — e.g. the sidebar
+    boundary and the message-list-right plausibility boundary used by
+    app.safety.validators.validate_email_row_bbox() — drawn purely for a
+    human reviewer's spatial context, never read back by any decision
+    path. valid, if given, colors the bbox rectangle green (True) or red
+    (False) instead of the default red, so an accepted vs. rejected
+    candidate is visually obvious at a glance.
+
+    Returns the saved path, or None if drawing/saving failed (never
+    raises — a diagnostic artifact must never be able to break the real
+    grounding flow that called it)."""
     try:
         from PIL import Image, ImageDraw
     except ImportError:
@@ -45,9 +59,15 @@ def save_grounding_debug_artifact(
             img = img.convert("RGB")
             draw = ImageDraw.Draw(img)
 
+            if boundary_lines:
+                for line_x, line_color, line_label in boundary_lines:
+                    draw.line([line_x, 0, line_x, img.height], fill=line_color, width=2)
+                    draw.text((line_x + 2, img.height - 14), line_label, fill=line_color)
+
             if bbox_pixels is not None and len(bbox_pixels) == 4:
                 y_min, x_min, y_max, x_max = bbox_pixels
-                draw.rectangle([x_min, y_min, x_max, y_max], outline="red", width=3)
+                bbox_color = "red" if valid is False else ("lime" if valid is True else "red")
+                draw.rectangle([x_min, y_min, x_max, y_max], outline=bbox_color, width=3)
 
             if click_point is not None:
                 cx, cy = click_point

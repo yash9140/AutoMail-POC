@@ -23,6 +23,7 @@ transitive dependency).
 from __future__ import annotations
 
 import ctypes
+import time
 
 SEARCH_STATE_ALLOWED_SUBSTRINGS = (
     "search",
@@ -72,3 +73,34 @@ def is_search_state_foreground(title: str) -> bool:
 
 def is_outlook_foreground(title: str) -> bool:
     return OUTLOOK_FOREGROUND_SUBSTRING in (title or "").lower()
+
+
+def confirm_outlook_foreground_with_recheck(max_recheck_attempts: int = 0, recheck_wait_seconds: float = 0.0) -> str:
+    """Returns the observed foreground window title. Requires Outlook on
+    the FIRST check for the common/fast path — zero added delay when
+    Outlook is already foreground, exactly like a plain
+    get_foreground_window_title() call.
+
+    2026-09-06 live fix: a live run's physical-action foreground check
+    (immediately before moving/clicking Reply) observed the Windows
+    Alt-Tab / task-switcher overlay ("Task Switching") as the foreground
+    window for a single instantaneous check, right after a long pair of
+    Vision calls — a transient window-manager state, not a genuine loss
+    of Outlook focus. Only when the FIRST check is not Outlook does this
+    retry up to max_recheck_attempts more times, each after
+    recheck_wait_seconds, mirroring the same bounded-poll idiom already
+    used by OutlookLaunchSteps.poll_for_outlook_foreground() — never an
+    unbounded loop, and never a reason to skip the caller's own final
+    is_outlook_foreground(title) decision on the returned title. If
+    Outlook never reappears within the bounded attempts, the LAST
+    observed (non-Outlook) title is returned, and the caller's existing
+    safe-stop behavior is completely unchanged."""
+    title = get_foreground_window_title()
+    if is_outlook_foreground(title):
+        return title
+    for _ in range(max_recheck_attempts):
+        time.sleep(recheck_wait_seconds)
+        title = get_foreground_window_title()
+        if is_outlook_foreground(title):
+            return title
+    return title

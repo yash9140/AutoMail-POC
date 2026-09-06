@@ -1,0 +1,20 @@
+{
+  "A": {
+    "n": 5,
+    "hit_tol0": 4,
+    "hit_tol5": 5,
+    "hit_tol10": 5
+  },
+  "B": {
+    "n": 5,
+    "hit_tol0": 1,
+    "hit_tol5": 3,
+    "hit_tol10": 4
+  },
+  "C": {
+    "n": 5,
+    "hit_tol0": 0,
+    "hit_tol5": 1,
+    "hit_tol10": 2
+  }
+}

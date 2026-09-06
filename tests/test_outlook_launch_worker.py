@@ -18,9 +18,6 @@ from app.workers.outlook_launch_worker import OutlookLaunchWorker  # noqa: E402
 
 STEPS_MODULE = "app.outlook.launch"
 
-_ENV_INFO_MATCH = {"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True}
-
-
 def test_worker_has_no_mid_run_approval_signal_or_blocking_mechanism():
     """Structural: the earlier mid-run approval_required signal + blocking
     threading.Event design was removed in favor of bounded upfront
@@ -72,7 +69,6 @@ def test_bounded_approval_granted_true_runs_end_to_end_to_success():
          patch(f"{STEPS_MODULE}.get_foreground_hwnd", return_value=12345), \
          patch(f"{STEPS_MODULE}.is_maximized", return_value=True), \
          patch(f"{STEPS_MODULE}.maximize") as mock_maximize, \
-         patch(f"{STEPS_MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH), \
          patch(f"{STEPS_MODULE}.capture_screen", return_value=MagicMock(filename="x.png", path="x.png", width=1920, height=1080)):
         mock_pyautogui.FAILSAFE = True
         worker.run()
@@ -100,7 +96,6 @@ def test_bounded_approval_granted_false_stops_before_click():
          patch(f"{STEPS_MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{STEPS_MODULE}.time.sleep"), \
          patch(f"{STEPS_MODULE}.get_foreground_window_title", return_value="Search"), \
-         patch(f"{STEPS_MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH), \
          patch(f"{STEPS_MODULE}.capture_screen", return_value=MagicMock(filename="x.png", path="x.png", width=1920, height=1080)):
         mock_pyautogui.FAILSAFE = True
         worker.run()
@@ -133,7 +128,6 @@ def test_grounding_failure_stops_before_any_approval_is_even_considered():
          patch(f"{STEPS_MODULE}.pyautogui") as mock_pyautogui, \
          patch(f"{STEPS_MODULE}.time.sleep"), \
          patch(f"{STEPS_MODULE}.get_foreground_window_title", return_value="Search"), \
-         patch(f"{STEPS_MODULE}.get_environment_info", return_value=_ENV_INFO_MATCH), \
          patch(f"{STEPS_MODULE}.capture_screen", return_value=MagicMock(filename="x.png", path="x.png", width=1920, height=1080)):
         mock_pyautogui.FAILSAFE = True
         worker.run()

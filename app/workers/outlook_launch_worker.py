@@ -93,19 +93,19 @@ class OutlookLaunchWorker(QObject):
         self.metrics_update.emit(steps.result.model_dump(mode="json"))
 
         # No mid-run pause here: the single bounded approval obtained
-        # before this worker started already covers proceeding to click
-        # the validated result. Grounding's own validation gates (search
-        # visible, label is Outlook, confidence threshold, in-bounds) are
-        # what actually gate the click now, not a human answering a
-        # question at this exact moment.
+        # before this worker started already covers proceeding to
+        # activate the validated result. Grounding's own validation gates
+        # (search visible, label is Outlook, target_type, confidence
+        # threshold) are what actually gate activation now, not a human
+        # answering a question at this exact moment.
         steps.record_human_approval(self.bounded_approval_granted)
         if not self.bounded_approval_granted:
             self.log_message.emit("Bounded approval was not granted for this session.")
             self._finish_from_result(steps)
             return
 
-        self.log_message.emit("Clicking the detected Outlook result")
-        if not steps.click_outlook_result():
+        self.log_message.emit("Activating the detected Outlook result (Enter)")
+        if not steps.activate_outlook_result():
             self._finish_from_result(steps)
             return
         self.metrics_update.emit(steps.result.model_dump(mode="json"))

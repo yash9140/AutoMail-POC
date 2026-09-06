@@ -1,0 +1,127 @@
+{
+  "source_screenshot": "D:\\AutoLook-POC\\outlook-vision-poc\\screenshots\\raw\\screen_20260906_165113_787.png",
+  "trials": [
+    {
+      "left_fraction": 0.35,
+      "trial": 1,
+      "schema_valid": true,
+      "latency_ms": 6471.8,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 22.2
+    },
+    {
+      "left_fraction": 0.35,
+      "trial": 2,
+      "schema_valid": true,
+      "latency_ms": 5997.0,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 23.6
+    },
+    {
+      "left_fraction": 0.35,
+      "trial": 3,
+      "schema_valid": true,
+      "latency_ms": 5863.5,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 24.2
+    },
+    {
+      "left_fraction": 0.38,
+      "trial": 1,
+      "schema_valid": true,
+      "latency_ms": 5355.3,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 15.8
+    },
+    {
+      "left_fraction": 0.38,
+      "trial": 2,
+      "schema_valid": true,
+      "latency_ms": 5561.1,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 30.6
+    },
+    {
+      "left_fraction": 0.38,
+      "trial": 3,
+      "schema_valid": true,
+      "latency_ms": 5658.5,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 38.2
+    },
+    {
+      "left_fraction": 0.4,
+      "trial": 1,
+      "schema_valid": true,
+      "latency_ms": 5615.4,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 46.1
+    },
+    {
+      "left_fraction": 0.4,
+      "trial": 2,
+      "schema_valid": true,
+      "latency_ms": 5631.3,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 43.1
+    },
+    {
+      "left_fraction": 0.4,
+      "trial": 3,
+      "schema_valid": true,
+      "latency_ms": 5428.4,
+      "semantic_correct": true,
+      "bbox_correct": true,
+      "nearest_candidate": "bottom_reply",
+      "distance": 43.7
+    }
+  ],
+  "summary": {
+    "0.35": {
+      "semantic_correct": "3/3",
+      "bbox_correct": "3/3",
+      "avg_latency_ms": 6110.8,
+      "distances": [
+        22.2,
+        23.6,
+        24.2
+      ]
+    },
+    "0.38": {
+      "semantic_correct": "3/3",
+      "bbox_correct": "3/3",
+      "avg_latency_ms": 5525.0,
+      "distances": [
+        15.8,
+        30.6,
+        38.2
+      ]
+    },
+    "0.4": {
+      "semantic_correct": "3/3",
+      "bbox_correct": "3/3",
+      "avg_latency_ms": 5558.4,
+      "distances": [
+        46.1,
+        43.1,
+        43.7
+      ]
+    }
+  }
+}

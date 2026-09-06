@@ -19,8 +19,20 @@ from app.playbook.failure_reasons import LaunchFailureReason  # noqa: E402
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.providers.base import VisionProviderError  # noqa: E402
 from app.vision.service import VisionService  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path  # noqa: E402
 
 MODULE = "app.outlook.send"
+
+# A plausible, crop-relative (relative to the reading-pane crop,
+# 1248x1080 at 1920x1080) action-bar bbox — remaps to a full-screen
+# region that in turn derives a valid, non-degenerate Stage-2 crop.
+# Exact numeric meaning doesn't matter for tests that only exercise
+# Stage-2's OWN validation (invalid bbox / out-of-range / low confidence
+# / wrong identity) — those keep working through any valid Stage-1
+# localization, since the crop transform is linear and preserves
+# validity/invalidity either way (same reasoning as the analogous Reply/
+# email crop-relative test fixtures elsewhere in this suite).
+DEFAULT_ACTION_BAR_BBOX = (900.0, 350.0, 980.0, 550.0)
 
 
 def _steps(send_approval_granted: bool = True) -> SendFlowSteps:
@@ -41,11 +53,26 @@ def _ready_steps(send_approval_granted: bool = True) -> SendFlowSteps:
 
 
 def _capture(width=1920, height=1080, filename="send.png"):
-    return MagicMock(filename=filename, path=filename, width=width, height=height)
+    return MagicMock(filename=filename, path=real_capture_image_path(width, height, name=filename), width=width, height=height)
+
+
+def _composer_localization_call(action_bar_bbox=DEFAULT_ACTION_BAR_BBOX, confidence=0.95,
+                                 composer_visible=True, action_bar_visible=True):
+    """Stage 1 (SEND_COMPOSER_LOCALIZATION) mock response — action_bar_bbox
+    is crop-relative to the reading-pane crop, per production's actual
+    contract (see app/outlook/send.py::_locate_send_composer_action_bar)."""
+    return MagicMock(
+        parsed_json={
+            "composer_visible": composer_visible, "action_bar_visible": action_bar_visible,
+            "action_bar_bbox": list(action_bar_bbox) if action_bar_bbox is not None else None,
+            "composer_bbox": None, "confidence": confidence, "reason": "ok",
+        },
+        raw_text="{}", model="gemini-3.6-flash", latency_ms=50.0, input_tokens=10, output_tokens=5,
+    )
 
 
 def _send_search_call(send_visible=True, identity="Send", control_type="button",
-                       bbox=(400.0, 800.0, 440.0, 900.0), confidence=0.9):
+                       bbox=(619.0, 385.0, 837.0, 616.0), confidence=0.9):
     return MagicMock(
         parsed_json={"outlook_visible": True, "send_visible": send_visible, "control_identity": identity,
                      "control_type": control_type, "bbox": list(bbox) if bbox is not None else None,
@@ -90,7 +117,7 @@ def test_precondition_passes_when_everything_satisfied():
 
 def test_invalid_bbox_zero_click():
     steps = _ready_steps()
-    steps.vision.primary.analyze_screen.return_value = _send_search_call(bbox=None)
+    steps.vision.primary.analyze_screen.side_effect = [_composer_localization_call(), _send_search_call(bbox=None)]
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -103,7 +130,14 @@ def test_invalid_bbox_zero_click():
 
 def test_out_of_range_bbox_zero_click():
     steps = _ready_steps()
-    steps.vision.primary.analyze_screen.return_value = _send_search_call(bbox=(400.0, 800.0, 440.0, 1500.0))
+    # A huge, unambiguous excess (crop-relative) — guaranteed to remain
+    # outside the valid 0-1000 range in full-screen space regardless of
+    # the dynamic crop's own (much smaller) size, unlike a merely
+    # slightly-out-of-range value which a small crop's linear remap
+    # could bring back inside range.
+    steps.vision.primary.analyze_screen.side_effect = [
+        _composer_localization_call(), _send_search_call(bbox=(400.0, 800.0, 440.0, 100000.0)),
+    ]
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -116,7 +150,9 @@ def test_out_of_range_bbox_zero_click():
 
 def test_low_confidence_zero_click():
     steps = _ready_steps()
-    steps.vision.primary.analyze_screen.return_value = _send_search_call(confidence=0.1)
+    steps.vision.primary.analyze_screen.side_effect = [
+        _composer_localization_call(), _send_search_call(confidence=0.1),
+    ]
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -129,7 +165,9 @@ def test_low_confidence_zero_click():
 
 def test_wrong_semantic_control_zero_click():
     steps = _ready_steps()
-    steps.vision.primary.analyze_screen.return_value = _send_search_call(identity="Schedule Send")
+    steps.vision.primary.analyze_screen.side_effect = [
+        _composer_localization_call(), _send_search_call(identity="Schedule Send"),
+    ]
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -175,7 +213,12 @@ def test_foreground_lost_between_move_and_click_zero_click():
 
 def test_provider_transient_error_during_grounding_retries_then_succeeds():
     steps = _ready_steps()
-    steps.vision.primary.analyze_screen.side_effect = [VisionProviderError("timeout"), _send_search_call()]
+    # Transient failure on Stage 1 (SEND_COMPOSER_LOCALIZATION)'s first
+    # attempt, retried once (PROVIDER_RETRY_COUNT=1) then succeeds;
+    # Stage 2 (SEND_GROUNDING) succeeds on its own first attempt.
+    steps.vision.primary.analyze_screen.side_effect = [
+        VisionProviderError("timeout"), _composer_localization_call(), _send_search_call(),
+    ]
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"), \
          patch(f"{MODULE}.capture_screen", return_value=_capture()), \
          patch(f"{MODULE}.pyautogui") as mock_pyautogui:
@@ -190,7 +233,9 @@ def test_provider_transient_error_during_grounding_retries_then_succeeds():
 
 def test_full_send_flow_one_click_then_verified():
     steps = _ready_steps()
-    steps.vision.primary.analyze_screen.side_effect = [_send_search_call(), _sent_verify_call(True)]
+    steps.vision.primary.analyze_screen.side_effect = [
+        _composer_localization_call(), _send_search_call(), _sent_verify_call(True),
+    ]
     with patch(f"{MODULE}.get_foreground_window_title", return_value="Outlook"):
         assert steps.validate_send_preconditions() is True
         with patch(f"{MODULE}.capture_screen", return_value=_capture()), \

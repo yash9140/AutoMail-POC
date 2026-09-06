@@ -23,20 +23,32 @@ RND009DResult — rnd/ is never edited).
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime
 from pathlib import Path
 
 from app.automation.screen_capture import DEFAULT_OUTPUT_DIR, ScreenCaptureError, capture_screen
-from app.automation.scrolling import scroll_email_body
+from app.automation.scrolling import scroll_email_reading_body
 from app.config.settings import (
+    EMAIL_BODY_SCROLL_ANCHOR_X_FRACTION,
+    EMAIL_BODY_SCROLL_ANCHOR_Y_FRACTION,
+    EMAIL_BODY_SCROLL_MOVEMENT_CHANGED_THRESHOLD,
+    EMAIL_BODY_SCROLL_MOVEMENT_ROI_X_MAX_FRACTION,
+    EMAIL_BODY_SCROLL_MOVEMENT_ROI_X_MIN_FRACTION,
+    EMAIL_BODY_SCROLL_MOVEMENT_ROI_Y_MAX_FRACTION,
+    EMAIL_BODY_SCROLL_MOVEMENT_ROI_Y_MIN_FRACTION,
+    EMAIL_BODY_SCROLL_MOVEMENT_SUFFICIENT_THRESHOLD,
     EMAIL_BODY_SCROLL_STABILIZE_WAIT_SECONDS,
+    EMAIL_READING_SCROLL_AMOUNT,
+    EMAIL_READING_SCROLL_AMOUNT_BOOSTED,
     EMAIL_SECTION_TAIL_CHARS,
     MAX_EMAIL_BODY_SCROLL_ATTEMPTS,
 )
 from app.metrics.step_metrics import estimate_cost
 from app.playbook.failure_reasons import LaunchFailureReason
 from app.safety.foreground import get_foreground_window_title, is_outlook_foreground
+from app.safety.screen_freshness import compute_roi_difference_score
 from app.vision.models import (
     EmailHolisticAssessmentResponse,
     EmailSection,
@@ -45,6 +57,14 @@ from app.vision.models import (
 )
 from app.vision.service import VisionRequest
 from rnd.models.outlook_launch import CallMetrics
+
+_email_read_logger = logging.getLogger("app.outlook.read_email.completion")
+if not _email_read_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s [EMAIL_READ] %(message)s"))
+    _email_read_logger.addHandler(_handler)
+    _email_read_logger.setLevel(logging.INFO)
+    _email_read_logger.propagate = False
 
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "app" / "vision" / "prompts"
 # Split into two calls (2026-09-04 latency fix — see EmailSectionExtractionResponse's
@@ -81,6 +101,18 @@ def _merge_unique(*lists: list[str]) -> list[str]:
                 seen.add(key)
                 merged.append(item)
     return merged
+
+
+def _email_body_scroll_movement_roi_px(screen_width: int, screen_height: int) -> tuple[int, int, int, int]:
+    """Pure geometry for the post-scroll movement guard's ROI — see
+    app.config.settings.EMAIL_BODY_SCROLL_MOVEMENT_ROI_*_FRACTION for why
+    y_min sits below the reading pane's own sticky subject-line banner."""
+    return (
+        round(EMAIL_BODY_SCROLL_MOVEMENT_ROI_X_MIN_FRACTION * screen_width),
+        round(EMAIL_BODY_SCROLL_MOVEMENT_ROI_Y_MIN_FRACTION * screen_height),
+        round(EMAIL_BODY_SCROLL_MOVEMENT_ROI_X_MAX_FRACTION * screen_width),
+        round(EMAIL_BODY_SCROLL_MOVEMENT_ROI_Y_MAX_FRACTION * screen_height),
+    )
 
 
 class EmailUnderstandingSteps:
@@ -149,15 +181,33 @@ class EmailUnderstandingSteps:
             stripped_content = _strip_overlap(raw.extracted_visible_content, raw.overlap_text)
 
             # STRICT completion rule: content_complete is NEVER read
-            # directly from Vision — it is always this AND, computed
+            # directly from Vision — it is always this AND/OR, computed
             # here in Python. more_content_below=false alone is never
-            # enough (that was the live bug: Vision reported it false on
-            # seeing a Reply control / signature / believing "enough"
-            # was read, before the true end of a long email was ever
-            # seen) — end_of_message_visible requires Vision to have
+            # enough (that was the original live bug: Vision reported it
+            # false on seeing a Reply control / signature / believing
+            # "enough" was read, before the true end of a long email was
+            # ever seen). end_of_message_visible requires Vision to have
             # POSITIVE evidence of the actual end (see the prompt's
-            # explicit forbidden-reasons list for that field).
-            reached_true_end = (not raw.more_content_below) and raw.end_of_message_visible
+            # explicit forbidden-reasons list for that field) — OR
+            # conversation_history_visible_below (2026-09-06 threaded-
+            # conversation fix): a live run had a short, COMPLETE target
+            # message correctly followed by a separate historical reply
+            # card, and the reader confused "another conversation item is
+            # below" with "the current message continues below," scrolling
+            # repeatedly before safe-stopping as CONTENT_NOT_FULLY_READ on
+            # an email that was already fully read. Seeing a structurally
+            # distinct next conversation item IS positive evidence that
+            # THIS message ended — the original end_of_message_visible
+            # definition (blank space / exhausted scrollbar only) never
+            # accounted for Outlook's threaded-conversation UI. Both
+            # more_content_below and conversation_history_visible_below
+            # are themselves scoped to the CURRENT TARGET message by the
+            # prompt (see EmailSectionExtractionResponse's docstring) —
+            # this Python logic trusts that scoping, it does not
+            # re-derive it.
+            reached_true_end = (not raw.more_content_below) and (
+                raw.end_of_message_visible or raw.conversation_history_visible_below
+            )
 
             # Scroll-progress verification, using the SAME existing
             # overlap-tail mechanism this file already relies on (never
@@ -180,6 +230,7 @@ class EmailUnderstandingSteps:
                 overlap_with_previous=raw.overlap_text or None,
                 more_content_below=raw.more_content_below,
                 end_of_message_visible=raw.end_of_message_visible,
+                conversation_history_visible_below=raw.conversation_history_visible_below,
                 no_new_content=no_progress,
                 confidence=raw.confidence,
                 # reply_expectation/requires_user_decision/requires_reply/
@@ -194,13 +245,26 @@ class EmailUnderstandingSteps:
             self.result.email_sections.append(section)
             self.result.sections_seen = len(self.result.email_sections)
 
+            _email_read_logger.info(
+                "EMAIL_SECTION_ANALYSIS section_index=%s current_message_continues_below=%s "
+                "current_message_end_visible=%s conversation_history_visible_below=%s "
+                "new_target_content_chars=%s no_new_content=%s",
+                section_index, raw.more_content_below, raw.end_of_message_visible,
+                raw.conversation_history_visible_below, len(stripped_content), no_progress,
+            )
+
             if no_progress and not reached_true_end:
                 self.result.content_complete = False
                 self.result.result = "FAIL"
                 self.result.failure_reason = LaunchFailureReason.CONTENT_NOT_FULLY_READ
+                _email_read_logger.info(
+                    "EMAIL_CONTENT_DECISION content_complete=False reason=unresolved_after_no_progress"
+                )
+                _email_read_logger.info("EMAIL_SCROLL_DECISION should_scroll=False reason=no_progress_detected")
                 self.result.notes = (
-                    f"Body scroll before section {section_index} produced no new content, but the email's "
-                    "true end was not confirmed (more_content_below and/or end_of_message_visible evidence "
+                    f"Body scroll before section {section_index} produced no new target-message content, "
+                    "but the current target message's true end was not confirmed (current_message_continues_"
+                    "below and/or current_message_end_visible/conversation_history_visible_below evidence "
                     "still incomplete). A stuck/ineffective scroll is never silently retried into 'more "
                     "attempts' or treated as reaching the end."
                 )
@@ -208,6 +272,8 @@ class EmailUnderstandingSteps:
 
             if reached_true_end:
                 self.result.content_complete = True
+                reason = "current_message_boundary_visible" if raw.end_of_message_visible else "conversation_history_visible_below"
+                _email_read_logger.info("EMAIL_CONTENT_DECISION content_complete=True reason=%s", reason)
                 if not self._run_holistic_assessment(capture):
                     return False
                 return self._finalize_understanding(reading_start)
@@ -215,9 +281,12 @@ class EmailUnderstandingSteps:
             if section_index < MAX_EMAIL_BODY_SCROLL_ATTEMPTS:
                 if self.check_abort("before_email_body_scroll"):
                     return False
-                scroll_email_body(capture.width, capture.height)
+                _email_read_logger.info(
+                    "EMAIL_SCROLL_DECISION should_scroll=True reason=current_message_continues_below"
+                )
+                if not self._scroll_email_body_with_safety_checks(capture):
+                    return False
                 self.result.email_body_scroll_attempts += 1
-                time.sleep(EMAIL_BODY_SCROLL_STABILIZE_WAIT_SECONDS)
                 continue
 
             # Bounded limit reached without confirmed true-end evidence —
@@ -225,8 +294,11 @@ class EmailUnderstandingSteps:
             self.result.content_complete = False
             self.result.result = "FAIL"
             self.result.failure_reason = LaunchFailureReason.CONTENT_NOT_FULLY_READ
+            _email_read_logger.info("EMAIL_CONTENT_DECISION content_complete=False reason=continues_below")
+            _email_read_logger.info("EMAIL_SCROLL_DECISION should_scroll=False reason=bounded_limit_reached")
             self.result.notes = (
-                f"Email body's true end was not confirmed (more_content_below and/or end_of_message_visible) "
+                f"Current target message's true end was not confirmed (current_message_continues_below "
+                f"and/or current_message_end_visible/conversation_history_visible_below) "
                 f"after {MAX_EMAIL_BODY_SCROLL_ATTEMPTS} bounded section reads. Not proceeding to Reply/draft "
                 "generation on an incomplete read."
             )
@@ -234,6 +306,89 @@ class EmailUnderstandingSteps:
 
         # Unreachable — the loop above always returns.
         return False
+
+    def _scroll_email_body_with_safety_checks(self, pre_scroll_capture) -> bool:
+        """The ONE physical email-body-scroll path (2026-09-06 scroll-
+        distance fix) — foreground/abort-checked immediately before the
+        physical action, then a bounded, deterministic post-scroll
+        movement guard (never a content-completion decision — see
+        EMAIL_SCROLL_MOVEMENT_RESULT's own docstring note below; Vision's
+        existing current_message_continues_below/no-progress logic is
+        completely untouched and still runs on the NEXT loop iteration
+        exactly as before).
+
+        Uses app.config.settings.EMAIL_READING_SCROLL_AMOUNT normally;
+        EMAIL_READING_SCROLL_AMOUNT_BOOSTED exactly ONCE per run, only
+        immediately after a scroll whose own movement guard found the
+        visual change not clearly above the measured too-small-scroll
+        baseline (see settings for the exact evidence) — never two
+        physical scrolls back-to-back without this same fresh-Vision-
+        observation loop in between; the boost flag is consumed
+        (reset to False) the instant it is used, so at most one scroll
+        per run is ever boosted before being re-evaluated.
+
+        Returns False (with self.result already set to a terminal
+        FAIL/ERROR state) on foreground loss or a capture failure — NO
+        physical scroll in the foreground-loss case; the scroll has
+        already happened by the time a capture failure could occur, but
+        no FURTHER action is taken either way."""
+        title = get_foreground_window_title()
+        foreground_ok = is_outlook_foreground(title)
+        abort_requested = self.abort_controller.is_abort_requested()
+        cursor_x = round(pre_scroll_capture.width * EMAIL_BODY_SCROLL_ANCHOR_X_FRACTION)
+        cursor_y = round(pre_scroll_capture.height * EMAIL_BODY_SCROLL_ANCHOR_Y_FRACTION)
+        _email_read_logger.info(
+            "EMAIL_SCROLL_PRECHECK foreground_ok=%s abort_requested=%s cursor_x=%s cursor_y=%s",
+            foreground_ok, abort_requested, cursor_x, cursor_y,
+        )
+        if abort_requested:
+            return False  # check_abort() immediately before this call already set self.result
+        if not foreground_ok:
+            self.result.result = "FAIL"
+            self.result.failure_reason = LaunchFailureReason.OUTLOOK_FOREGROUND_LOST
+            self.result.notes = f"Outlook not foreground before email-body scroll; foreground was {title!r}. NO scroll performed."
+            return False
+
+        boost_pending = getattr(self, "_email_body_scroll_boost_pending", False)
+        scroll_amount = EMAIL_READING_SCROLL_AMOUNT_BOOSTED if boost_pending else EMAIL_READING_SCROLL_AMOUNT
+        scroll_method = "wheel_boosted" if boost_pending else "wheel"
+        self._email_body_scroll_boost_pending = False  # consumed — never re-applied without a fresh too-small measurement
+
+        _email_read_logger.info(
+            "EMAIL_SCROLL_ABOUT_TO_EXECUTE scroll_method=%s scroll_amount=%s", scroll_method, scroll_amount,
+        )
+        scroll_email_reading_body(pre_scroll_capture.width, pre_scroll_capture.height, scroll_amount)
+        _email_read_logger.info("EMAIL_SCROLL_EXECUTED")
+        time.sleep(EMAIL_BODY_SCROLL_STABILIZE_WAIT_SECONDS)
+
+        try:
+            post_scroll_capture = capture_screen(DEFAULT_OUTPUT_DIR)
+        except ScreenCaptureError as exc:
+            self.result.result = "ERROR"
+            self.result.failure_reason = LaunchFailureReason.TECHNICAL_PROVIDER_ERROR
+            self.result.notes = f"Post-scroll movement-check capture failed: {exc}"
+            return False
+
+        roi = _email_body_scroll_movement_roi_px(pre_scroll_capture.width, pre_scroll_capture.height)
+        difference_score = compute_roi_difference_score(pre_scroll_capture.path, post_scroll_capture.path, roi)
+        changed = difference_score > EMAIL_BODY_SCROLL_MOVEMENT_CHANGED_THRESHOLD
+        sufficient = difference_score >= EMAIL_BODY_SCROLL_MOVEMENT_SUFFICIENT_THRESHOLD
+        attempt_number = self.result.email_body_scroll_attempts + 1
+        # estimated_shift_px: NOT computed at runtime. Offline replay
+        # (benchmarks/email_reading/measure_scroll_displacement.py)
+        # needed a landmark specific to one frozen email's own content to
+        # get a reliable pixel-shift number without periodicity aliasing
+        # from repeating paragraph lines — no such generic, reliable,
+        # cheap estimator exists for arbitrary live email content, so
+        # this field is always logged as None; difference_score/changed
+        # is the real (and sufficient) runtime signal.
+        _email_read_logger.info(
+            "EMAIL_SCROLL_MOVEMENT_RESULT changed=%s difference_score=%.2f estimated_shift_px=%s attempt=%s",
+            changed, difference_score, None, attempt_number,
+        )
+        if not sufficient:
+            self._email_body_scroll_boost_pending = True
+        return True
 
     def _accumulated_tail(self) -> str:
         if not self.result.email_sections:

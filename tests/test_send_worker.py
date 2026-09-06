@@ -17,6 +17,7 @@ from app.outlook.find_email import TARGET_EMAIL_SENDER, TARGET_EMAIL_SUBJECT  # 
 from app.safety.abort_controller import AbortController  # noqa: E402
 from app.vision.service import VisionService  # noqa: E402
 from app.workers.send_worker import SendWorker  # noqa: E402
+from tests._capture_test_utils import real_capture_image_path, to_crop_relative_bbox  # noqa: E402
 
 LAUNCH_MODULE = "app.outlook.launch"
 FIND_MODULE = "app.outlook.find_email"
@@ -52,7 +53,7 @@ def _email_grounding():
             "candidate_count": 1,
             "candidates": [{
                 "sender": TARGET_EMAIL_SENDER, "subject": TARGET_EMAIL_SUBJECT, "date_or_order": "Today",
-                "row_bbox": [480.0, 300.0, 520.0, 900.0], "confidence": 0.95,
+                "row_bbox": to_crop_relative_bbox([480.0, 300.0, 520.0, 480.0]), "confidence": 0.95,
             }],
             "more_content_below": False, "reason": "ok",
         },
@@ -103,10 +104,19 @@ def _draft_verification(semantic_match=True):
     )
 
 
+def _send_composer_localization():
+    return MagicMock(
+        parsed_json={"composer_visible": True, "action_bar_visible": True,
+                     "action_bar_bbox": [900.0, 350.0, 980.0, 550.0], "composer_bbox": None,
+                     "confidence": 0.95, "reason": "ok"},
+        raw_text="{}", model="gemini-3.6-flash", latency_ms=80.0, input_tokens=10, output_tokens=5,
+    )
+
+
 def _send_search():
     return MagicMock(
         parsed_json={"outlook_visible": True, "send_visible": True, "control_identity": "Send",
-                     "control_type": "button", "bbox": [400.0, 800.0, 440.0, 900.0], "confidence": 0.95,
+                     "control_type": "button", "bbox": [619.0, 385.0, 837.0, 616.0], "confidence": 0.95,
                      "reason": "ok"},
         raw_text="{}", model="gemini-3.6-flash", latency_ms=100.0, input_tokens=10, output_tokens=5,
     )
@@ -143,10 +153,6 @@ def _patch_full_chain(stack: ExitStack, titles) -> dict:
     stack.enter_context(patch(f"{LAUNCH_MODULE}.get_foreground_hwnd", return_value=12345))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.is_maximized", return_value=True))
     stack.enter_context(patch(f"{LAUNCH_MODULE}.maximize"))
-    stack.enter_context(patch(
-        f"{LAUNCH_MODULE}.get_environment_info",
-        return_value={"pyautogui_width": 1920, "pyautogui_height": 1080, "dimensions_match": True},
-    ))
     for module in (FIND_MODULE, READ_MODULE, REPLY_MODULE, DRAFT_MODULE, SEND_MODULE):
         stack.enter_context(patch(f"{module}.get_foreground_window_title", return_value="Inbox - Outlook"))
 
@@ -159,7 +165,10 @@ def _patch_full_chain(stack: ExitStack, titles) -> dict:
     ):
         stack.enter_context(patch(
             f"{module}.capture_screen",
-            return_value=MagicMock(filename=f"{name}.png", path=f"{name}.png", width=1920, height=1080),
+            return_value=MagicMock(
+                filename=f"{name}.png", path=real_capture_image_path(1920, 1080, name=f"{name}.png"),
+                width=1920, height=1080,
+            ),
         ))
 
     return pyautogui_mocks
@@ -181,6 +190,7 @@ def test_full_chain_reaches_sent_verified():
         _state_check(True),          # verify_reply_editor
         _draft_generation(),
         _draft_verification(True),
+        _send_composer_localization(),
         _send_search(),
         _sent_verification(True),
     ]
@@ -252,6 +262,7 @@ def test_verification_uncertain_keeps_click_count_one_end_to_end():
         _search_grounding(), _readiness_ready(), _email_grounding(), _email_open_verified(),
         _understanding(), _understanding(),  # extraction call, then holistic-assessment call (2026-09-04 split)
         _state_check(True), _state_check(True), _draft_generation(), _draft_verification(True),
+        _send_composer_localization(),
         _send_search(),
         _sent_verification(False), _sent_verification(False),  # both verification attempts inconclusive
     ]

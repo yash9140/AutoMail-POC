@@ -5,7 +5,8 @@ whether a subject "matches" — you only report what you can actually
 see, verbatim. The playbook (deterministic Python) makes every matching
 decision from what you report here.
 
-Original screenshot dimensions:
+Image dimensions (this may be a crop of the full screen — report every
+coordinate below relative to THIS image only, not any larger screen):
 width = {width}
 height = {height}
 
@@ -28,6 +29,17 @@ candidate — regardless of what its subject looks like. Do NOT filter
 rows by subject yourself, and do not silently pick only one; the
 playbook decides which candidate(s), if any, are eligible.
 
+IMPORTANT — several rows can show the SAME sender name. Each candidate
+you report is ONE SPECIFIC ROW: its sender, its subject, and its
+row_bbox must ALL come from that SAME row — never copy the sender or
+subject from one row while reporting the row_bbox of a different row,
+even (especially) when that different row has the same sender. When
+the same sender appears multiple times, subject text is the primary
+way to tell those rows apart — before finalizing each candidate,
+re-check that the row_bbox you are about to report visually surrounds
+the row whose subject text you are reporting for that same candidate,
+not a neighboring row.
+
 For each candidate's subject, report ONLY the text actually visible in
 that row, exactly as rendered — character for character, including a
 trailing ellipsis or cut-off word if that is literally what the row
@@ -41,17 +53,39 @@ clipped.
 
 For each candidate, report its bounding box as [y_min, x_min, y_max,
 x_max] in the same 0-1000 normalized coordinate space used throughout
-this project. The box MUST cover the FULL CLICKABLE MESSAGE-LIST ROW —
-the entire horizontal band a user would click anywhere on to open that
-email, from just past the left navigation pane to the right edge of
-the row's visible content (sender, subject, and any preview/date text
-shown) — never just the sender text, never just the subject text,
-never only a checkbox/unread-dot/avatar icon at the row's left edge,
-never the reading pane, and never the left navigation/folder pane
-itself. A row that is only partially bounded (e.g. stopping right
-after the avatar, before the sender/subject text) is NOT acceptable —
-the box's right edge (x_max) must extend to cover the visible
-sender/subject text, not just the leftmost icon.
+this project. row_bbox means: the TIGHT bounding box of the clickable
+message-list row containing this candidate's avatar, sender, subject,
+preview text, and date/time — nothing more, nothing less. The box MUST
+cover the FULL CLICKABLE MESSAGE-LIST ROW — the entire horizontal band
+a user would click anywhere on to open that email, from just past the
+left navigation pane to the right edge of the row's own visible
+content (sender, subject, and any preview/date text shown) — never
+just the sender text, never just the subject text, never only a
+checkbox/unread-dot/avatar icon at the row's left edge, never the
+reading pane, and never the left navigation/folder pane itself. A row
+that is only partially bounded (e.g. stopping right after the avatar,
+before the sender/subject text) is NOT acceptable — the box's right
+edge (x_max) must extend to cover the visible sender/subject text, not
+just the leftmost icon.
+
+The message-list column and the reading pane are TWO SEPARATE UI
+REGIONS, side by side. The row's right edge (x_max) must stop where the
+message-list column's own visible content ends — do NOT draw one
+broad box that spans both the message-list column AND the reading pane
+(or any other large empty area to the right of the message-list
+column) just because nothing else is directly to the right of the
+text. Keep the box TIGHT to the row's own content on all sides; a box
+several times wider than the row's actual visible text is not
+acceptable even if it still starts at the correct left edge.
+
+The row's right edge (x_max) specifically must stop at the rightmost
+pixel of this row's own actual VISIBLE TEXT/CONTENT (e.g. the last
+character of the date/time, or the last character of the preview text
+if that extends further right than the date) — NOT at the edge of the
+row's clickable background/highlight area (which can visually extend
+further right than the text it contains), and NOT including any
+trailing flag/pin/attachment-icon control that sits to the right of
+the date and is not core sender/subject/date content.
 
 Also report date_or_order exactly as shown in the UI (e.g. a visible
 timestamp, "Yesterday", "Mon 9/1", or the row's position in the list
@@ -65,6 +99,23 @@ report more_content_below=true.
 Analyze only what is visually present in this screenshot. Do not
 assume a candidate exists if you cannot actually see a row matching
 the sender. Do not invent a match, and never invent subject text.
+
+OUTPUT RULES — keep the response compact and strictly valid JSON:
+1. Return ONLY the JSON object below — no markdown, no ``` code fences,
+   no prose or explanation before or after it, and no chain-of-thought.
+2. Completeness is a SAFETY requirement, not a style choice: include
+   EVERY candidate whose sender matches the target sender. Never omit
+   a real candidate to save space, and never stop early after finding
+   one match if more matching rows are visible.
+3. Copy each candidate's sender/subject text verbatim exactly once —
+   never paraphrase it, never repeat it elsewhere in the response, and
+   never add descriptive commentary about it.
+4. Do not describe the Outlook interface in general, the reading pane,
+   or any candidate's preview/body text beyond the fields requested
+   below.
+5. Keep the top-level "reason" field to one short factual phrase
+   (10 words or fewer) — it is for audit logging, not an explanation
+   of your reasoning.
 
 Return ONLY the following structured JSON, with no other text before
 or after it:
